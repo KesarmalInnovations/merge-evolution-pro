@@ -1,0 +1,31 @@
+name: Build Merge Evolution PRO AAB
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract ZIP
+        run: |
+          if [ -f "FINAL-UPLOAD-ZIP.zip" ]; then unzip -o FINAL-UPLOAD-ZIP.zip; rm FINAL-UPLOAD-ZIP.zip; fi
+          ls -la
+          ls -la www/
+      - uses: actions/setup-node@v4
+        with: {node-version: '18'}
+      - uses: actions/setup-java@v4
+        with: {distribution: 'temurin', java-version: '17'}
+      - uses: android-actions/setup-android@v3
+      - run: npm install
+      - run: npx cap add android || true
+      - run: npx cap sync android
+      - run: |
+          keytool -genkey -v -keystore android/app/release.keystore -alias mergeevolution -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Merge Evolution PRO, OU=Game Studio, O=Kesarmal Innovations, L=Delhi, S=Delhi, C=IN"
+          echo "MYAPP_UPLOAD_STORE_FILE=release.keystore" >> android/gradle.properties
+          echo "MYAPP_UPLOAD_KEY_ALIAS=mergeevolution" >> android/gradle.properties
+          echo "MYAPP_UPLOAD_STORE_PASSWORD=123456" >> android/gradle.properties
+          echo "MYAPP_UPLOAD_KEY_PASSWORD=123456" >> android/gradle.properties
+      - run: cd android && chmod +x gradlew && ./gradlew bundleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: merge-evolution-pro-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
