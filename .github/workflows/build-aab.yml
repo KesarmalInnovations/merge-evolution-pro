@@ -5,50 +5,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Create Game Files
         run: |
           cat > package.json << 'EOF'
-          {
-            "name": "merge-evolution-pro",
-            "version": "1.0.0",
-            "private": true,
-            "dependencies": {
-              "@capacitor/core": "^5.7.0",
-              "@capacitor/cli": "^5.7.0",
-              "@capacitor/android": "^5.7.0"
-            }
-          }
+          {"name":"merge-evolution-pro","version":"1.0.0","private":true,"dependencies":{"@capacitor/core":"^5.7.0","@capacitor/cli":"^5.7.0","@capacitor/android":"^5.7.0"}}
           EOF
           cat > capacitor.config.json << 'EOF'
-          {
-            "appId": "com.mergeevolution.dragons",
-            "appName": "Merge Evolution PRO",
-            "webDir": "www",
-            "bundledWebRuntime": false
-          }
+          {"appId":"com.mergeevolution.dragons","appName":"Merge Evolution PRO","webDir":"www","bundledWebRuntime":false}
           EOF
           mkdir -p www
-          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Merge Evolution PRO</title><style>body{margin:0;background:#0f0f0f;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column}h1{color:#00ff88}.box{background:#1a1a1a;padding:30px;border-radius:15px;text-align:center}</style></head><body><div class="box"><h1>🐉 Merge Evolution PRO</h1><p>Game Loading...</p><p style="color:#888;font-size:12px">Build v2 Signed ✅</p></div></body></html>' > www/index.html
-
+          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Merge Evolution PRO</title><style>body{margin:0;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:sans-serif}h1{color:#00ff88}.box{background:#1a1a1a;padding:30px;border-radius:15px;text-align:center}</style></head><body><div class="box"><h1>🐉 Merge Evolution PRO</h1><p>API 35 Ready ✅</p></div></body></html>' > www/index.html
       - uses: actions/setup-node@v4
-        with:
-          node-version: 18
+        with: {node-version: 18}
       - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
+        with: {distribution: temurin, java-version: 17}
       - uses: android-actions/setup-android@v3
-
-      - name: Build SIGNED AAB
+      - name: Build API 35 Signed AAB
         run: |
           npm install
           npx cap add android || true
           npx cap sync android
+          echo "Forcing API 35..."
+          sed -i 's/compileSdkVersion = 33/compileSdkVersion = 35/g' android/variables.gradle || true
+          sed -i 's/targetSdkVersion = 33/targetSdkVersion = 35/g' android/variables.gradle || true
+          sed -i 's/compileSdk 33/compileSdk 35/g' android/app/build.gradle || true
+          sed -i 's/targetSdk 33/targetSdk 35/g' android/app/build.gradle || true
+          sed -i 's/targetSdkVersion 33/targetSdkVersion 35/g' android/app/build.gradle || true
+          cat android/variables.gradle
           cd android
           keytool -genkey -v -keystore app/release.keystore -alias mergeevolution -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Merge Evolution PRO, OU=Game Studio, O=Kesarmal Innovations, L=Delhi, S=Delhi, C=IN"
           cat >> app/build.gradle << 'EOF'
-
           android {
             signingConfigs {
               release {
@@ -67,11 +53,8 @@ jobs:
           }
           EOF
           chmod +x gradlew
-          ./gradlew bundleRelease --stacktrace
-          echo "--- Signing verify ---"
-          jarsigner -verify app/build/outputs/bundle/release/app-release.aab || true
+          ./gradlew bundleRelease
           ls -lh app/build/outputs/bundle/release/
-
       - uses: actions/upload-artifact@v4
         with:
           name: merge-evolution-pro-aab
