@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create Game Files
+      - name: Create Game
         run: |
           cat > package.json << 'EOF'
           {"name":"merge-evolution-pro","version":"1.0.0","private":true,"dependencies":{"@capacitor/core":"^5.7.0","@capacitor/cli":"^5.7.0","@capacitor/android":"^5.7.0"}}
@@ -14,32 +14,31 @@ jobs:
           {"appId":"com.mergeevolution.dragons","appName":"Merge Evolution PRO","webDir":"www","bundledWebRuntime":false}
           EOF
           mkdir -p www
-          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Merge Evolution PRO</title><style>body{margin:0;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:sans-serif}h1{color:#00ff88}.box{background:#1a1a1a;padding:30px;border-radius:15px;text-align:center}</style></head><body><div class="box"><h1>🐉 Merge Evolution PRO</h1><p>API 35 FIX ✅</p></div></body></html>' > www/index.html
+          echo '<html><body style="background:#111;color:#0f8;text-align:center;padding:50px;font-family:sans-serif"><h1>🐉 Merge Evolution PRO</h1><p>API 35 Fixed Build ✅</p></body></html>' > www/index.html
       - uses: actions/setup-node@v4
         with: {node-version: 18}
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: 17}
       - uses: android-actions/setup-android@v3
-      - name: Install API 35 SDK (Important)
+      - name: Install SDK 35 & Force Build-Tools 35
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platforms;android-34"
-          sdkmanager --list | grep 35
-      - name: Build Signed AAB API 35
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platforms;android-34" "build-tools;34.0.0"
+      - name: Build AAB API 35
         run: |
           npm install
           npx cap add android || true
           npx cap sync android
           echo "android.suppressUnsupportedCompileSdk=35" >> android/gradle.properties
-          echo "android.suppressUnsupportedTargetSdk=35" >> android/gradle.properties
-          echo "--- Before ---"
-          cat android/variables.gradle
+          # Force 35 in variables.gradle
           sed -i 's/compileSdkVersion = .*/compileSdkVersion = 35/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 35/' android/variables.gradle
-          sed -i "s/compileSdkVersion = 33/compileSdkVersion = 35/g" android/variables.gradle || true
-          sed -i "s/targetSdkVersion = 33/targetSdkVersion = 35/g" android/variables.gradle || true
-          echo "--- After ---"
+          # Force Build-Tools 35 and AGP 8.6.1
+          sed -i "s/com.android.tools.build:gradle:.*/com.android.tools.build:gradle:8.6.1'/" android/build.gradle
+          # Inject buildToolsVersion in app/build.gradle
+          sed -i '/android {/a \    buildToolsVersion "35.0.0"' android/app/build.gradle
           cat android/variables.gradle
+          cat android/build.gradle | head -n 20
           cd android
           keytool -genkey -v -keystore app/release.keystore -alias mergeevolution -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Merge Evolution PRO, OU=Game, O=Kesarmal, L=Delhi, S=Delhi, C=IN"
           cat >> app/build.gradle << 'EOF'
@@ -61,8 +60,7 @@ jobs:
           }
           EOF
           chmod +x gradlew
-          ./gradlew bundleRelease
-          ls -lh app/build/outputs/bundle/release/
+          ./gradlew bundleRelease --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: merge-evolution-pro-aab
