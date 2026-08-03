@@ -1,14 +1,13 @@
 {
   "name": "merge-evolution-pro",
-  "version": "2.0.0",
-  "description": "Merge Evolution PRO - Real AdMob Earning - by Kesarmal Innovations",
-  "dependencies": {
-    "@capacitor/core": "^5.0.0",
-    "@capacitor/android": "^5.0.0",
-    "capacitor-admob": "^5.0.0"
-  },
+  "version": "1.0.0",
+  "private": true,
   "scripts": {
-    "build": "echo build"
+    "build": "echo build done"
   },
-  "author": "Kesarmal Innovations"
+  "dependencies": {
+    "@capacitor/core": "^5.7.0",
+    "@capacitor/cli": "^5.7.0",
+    "@capacitor/android": "^5.7.0"
+  }
 }
