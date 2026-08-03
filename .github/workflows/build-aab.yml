@@ -14,26 +14,34 @@ jobs:
           {"appId":"com.mergeevolution.dragons","appName":"Merge Evolution PRO","webDir":"www","bundledWebRuntime":false}
           EOF
           mkdir -p www
-          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Merge Evolution PRO</title><style>body{margin:0;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:sans-serif}h1{color:#00ff88}.box{background:#1a1a1a;padding:30px;border-radius:15px;text-align:center}</style></head><body><div class="box"><h1>🐉 Merge Evolution PRO</h1><p>API 35 Ready ✅</p></div></body></html>' > www/index.html
+          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Merge Evolution PRO</title><style>body{margin:0;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:sans-serif}h1{color:#00ff88}.box{background:#1a1a1a;padding:30px;border-radius:15px;text-align:center}</style></head><body><div class="box"><h1>🐉 Merge Evolution PRO</h1><p>API 35 FIX ✅</p></div></body></html>' > www/index.html
       - uses: actions/setup-node@v4
         with: {node-version: 18}
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: 17}
       - uses: android-actions/setup-android@v3
-      - name: Build API 35 Signed AAB
+      - name: Install API 35 SDK (Important)
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platforms;android-34"
+          sdkmanager --list | grep 35
+      - name: Build Signed AAB API 35
         run: |
           npm install
           npx cap add android || true
           npx cap sync android
-          echo "Forcing API 35..."
-          sed -i 's/compileSdkVersion = 33/compileSdkVersion = 35/g' android/variables.gradle || true
-          sed -i 's/targetSdkVersion = 33/targetSdkVersion = 35/g' android/variables.gradle || true
-          sed -i 's/compileSdk 33/compileSdk 35/g' android/app/build.gradle || true
-          sed -i 's/targetSdk 33/targetSdk 35/g' android/app/build.gradle || true
-          sed -i 's/targetSdkVersion 33/targetSdkVersion 35/g' android/app/build.gradle || true
+          echo "android.suppressUnsupportedCompileSdk=35" >> android/gradle.properties
+          echo "android.suppressUnsupportedTargetSdk=35" >> android/gradle.properties
+          echo "--- Before ---"
+          cat android/variables.gradle
+          sed -i 's/compileSdkVersion = .*/compileSdkVersion = 35/' android/variables.gradle
+          sed -i 's/targetSdkVersion = .*/targetSdkVersion = 35/' android/variables.gradle
+          sed -i "s/compileSdkVersion = 33/compileSdkVersion = 35/g" android/variables.gradle || true
+          sed -i "s/targetSdkVersion = 33/targetSdkVersion = 35/g" android/variables.gradle || true
+          echo "--- After ---"
           cat android/variables.gradle
           cd android
-          keytool -genkey -v -keystore app/release.keystore -alias mergeevolution -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Merge Evolution PRO, OU=Game Studio, O=Kesarmal Innovations, L=Delhi, S=Delhi, C=IN"
+          keytool -genkey -v -keystore app/release.keystore -alias mergeevolution -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Merge Evolution PRO, OU=Game, O=Kesarmal, L=Delhi, S=Delhi, C=IN"
           cat >> app/build.gradle << 'EOF'
           android {
             signingConfigs {
