@@ -6,10 +6,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create Game Files (NO ZIP NEEDED)
+      - name: Create Game Files
         run: |
-          echo "Creating files from scratch..."
-          
           cat > package.json << 'EOF'
           {
             "name": "merge-evolution-pro",
@@ -22,7 +20,6 @@ jobs:
             }
           }
           EOF
-          
           cat > capacitor.config.json << 'EOF'
           {
             "appId": "com.mergeevolution.dragons",
@@ -31,15 +28,8 @@ jobs:
             "bundledWebRuntime": false
           }
           EOF
-          
           mkdir -p www
-          cat > www/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Merge Evolution PRO</title><style>body{margin:0;background:#0f0f0f;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column}h1{color:#00ff88}.box{background:#1a1a1a;padding:30px;border-radius:15px;text-align:center}</style></head><body><div class="box"><h1>🐉 Merge Evolution PRO</h1><p>Game Loading...</p><p style="color:#888;font-size:12px">Build Successful ✅</p></div><script>console.log("Game Ready");</script></body></html>
-          EOF
-          
-          cat package.json
-          ls -la www/
+          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Merge Evolution PRO</title><style>body{margin:0;background:#0f0f0f;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column}h1{color:#00ff88}.box{background:#1a1a1a;padding:30px;border-radius:15px;text-align:center}</style></head><body><div class="box"><h1>🐉 Merge Evolution PRO</h1><p>Game Loading...</p><p style="color:#888;font-size:12px">Build v2 Signed ✅</p></div></body></html>' > www/index.html
 
       - uses: actions/setup-node@v4
         with:
@@ -50,17 +40,37 @@ jobs:
           java-version: 17
       - uses: android-actions/setup-android@v3
 
-      - name: Build AAB
+      - name: Build SIGNED AAB
         run: |
           npm install
           npx cap add android || true
           npx cap sync android
-          keytool -genkey -v -keystore android/app/release.keystore -alias mergeevolution -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Merge Evolution PRO, OU=Game Studio, O=Kesarmal Innovations, L=Delhi, S=Delhi, C=IN"
-          echo "MYAPP_UPLOAD_STORE_FILE=release.keystore" >> android/gradle.properties
-          echo "MYAPP_UPLOAD_KEY_ALIAS=mergeevolution" >> android/gradle.properties
-          echo "MYAPP_UPLOAD_STORE_PASSWORD=123456" >> android/gradle.properties
-          echo "MYAPP_UPLOAD_KEY_PASSWORD=123456" >> android/gradle.properties
-          cd android && chmod +x gradlew && ./gradlew bundleRelease
+          cd android
+          keytool -genkey -v -keystore app/release.keystore -alias mergeevolution -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Merge Evolution PRO, OU=Game Studio, O=Kesarmal Innovations, L=Delhi, S=Delhi, C=IN"
+          cat >> app/build.gradle << 'EOF'
+
+          android {
+            signingConfigs {
+              release {
+                storeFile file('release.keystore')
+                storePassword '123456'
+                keyAlias 'mergeevolution'
+                keyPassword '123456'
+              }
+            }
+            buildTypes {
+              release {
+                signingConfig signingConfigs.release
+                minifyEnabled false
+              }
+            }
+          }
+          EOF
+          chmod +x gradlew
+          ./gradlew bundleRelease --stacktrace
+          echo "--- Signing verify ---"
+          jarsigner -verify app/build/outputs/bundle/release/app-release.aab || true
+          ls -lh app/build/outputs/bundle/release/
 
       - uses: actions/upload-artifact@v4
         with:
