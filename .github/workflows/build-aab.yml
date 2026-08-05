@@ -1,36 +1,55 @@
-name: FINAL - KesarmalInnovations MergeEvolution - REAL GAME
+name: FIX KEY - Real Game with Persistent Keystore
 on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Game Config - LOCKED PACKAGE
+
+      - name: Setup Game - Use Real www/index.html
         run: |
-          echo "PACKAGE: com.kesarmalinnovations.mergeevolution - REAL GAME"
           cat > package.json << 'EOF'
           {"name":"merge-evolution-pro","version":"1.1.0","private":true,"dependencies":{"@capacitor/core":"^6.2.0","@capacitor/cli":"^6.2.0","@capacitor/android":"^6.2.0"}}
           EOF
           cat > capacitor.config.json << 'EOF'
           {
-            "appId": "com.kesarmallinnovations.mergeevolution",
+            "appId": "com.kesarmalinnovations.mergeevolution",
             "appName": "Merge Evolution PRO",
             "webDir": "www",
             "bundledWebRuntime": false
           }
           EOF
           ls -lh www/
-          echo "Using REAL game from www/index.html"
+          echo "Using REAL game from www/index.html - ZEROED"
+
       - uses: actions/setup-node@v4
         with: {node-version: 20}
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: 21}
       - uses: android-actions/setup-android@v3
+
       - name: Install Android SDK 35
         run: |
           yes | sdkmanager --licenses || true
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
-      - name: Build AAB - API 35 + Locked Keystore
+
+      - name: Create or Reuse Keystore - PERSISTENT
+        run: |
+          mkdir -p android/app
+          # Agar repo me pehle se keystore hai to use karo, nahi to naya banao
+          if [ -f "android/app/release.keystore" ]; then
+            echo "Using existing keystore from repo"
+          else
+            echo "Creating NEW persistent keystore"
+            keytool -genkey -v -keystore android/app/release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
+          fi
+          # Certificate nikalo jo Play Console me upload karna hai
+          keytool -export -rfc -keystore android/app/release.keystore -alias kesarmal -storepass 123456 -file upload_certificate.pem
+          echo "=== SHA1 ==="
+          keytool -list -v -keystore android/app/release.keystore -alias kesarmal -storepass 123456 | grep SHA1
+          cat upload_certificate.pem
+
+      - name: Build AAB with Persistent Key
         run: |
           npm install
           npx cap add android
@@ -38,22 +57,29 @@ jobs:
           echo "android.suppressUnsupportedCompileSdk=35" >> android/gradle.properties
           sed -i 's/compileSdkVersion = .*/compileSdkVersion = 35/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 35/' android/variables.gradle
-          sed -i 's/versionCode .*/versionCode 2/' android/app/build.gradle || true
-          sed -i 's/versionName .*/versionName "1.1"/' android/app/build.gradle || true
-          cd android
-          keytool -genkey -v -keystore app/release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
+          sed -i 's/versionCode .*/versionCode 3/' android/app/build.gradle || true
+          sed -i 's/versionName .*/versionName "1.2"/' android/app/build.gradle || true
+          # Copy keystore to correct place
+          cp android/app/release.keystore android/app/release.keystore 2>/dev/null || true
           python3 << 'PY'
           import pathlib
-          p=pathlib.Path("app/build.gradle")
+          p=pathlib.Path("android/app/build.gradle")
           s=p.read_text()
           if "signingConfigs" not in s:
               s=s.replace("buildTypes {", 'signingConfigs {\n        release {\n            storeFile file("release.keystore")\n            storePassword "123456"\n            keyAlias "kesarmal"\n            keyPassword "123456"\n        }\n    }\n    buildTypes {')
           s=s.replace("minifyEnabled false", "minifyEnabled false\n            signingConfig signingConfigs.release")
           p.write_text(s)
           PY
+          cd android
           chmod +x gradlew
           ./gradlew bundleRelease
-      - uses: actions/upload-artifact@v4
+          ls -lh app/build/outputs/bundle/release/
+
+      - name: Upload AAB and Certificate
+        uses: actions/upload-artifact@v4
         with:
-          name: FINAL-REAL-GAME-AAB-v1.1
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: FIXED-AAB-and-Certificate
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            upload_certificate.pem
+            android/app/release.keystore
