@@ -1,4 +1,4 @@
-name: FIX KEY - Real Game with Persistent Keystore
+name: FINAL FIX - Persistent Keystore v3
 on: [push, workflow_dispatch]
 jobs:
   build:
@@ -6,7 +6,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Game - Use Real www/index.html
+      - name: Setup Game - Real ZEROED
         run: |
           cat > package.json << 'EOF'
           {"name":"merge-evolution-pro","version":"1.1.0","private":true,"dependencies":{"@capacitor/core":"^6.2.0","@capacitor/cli":"^6.2.0","@capacitor/android":"^6.2.0"}}
@@ -20,7 +20,8 @@ jobs:
           }
           EOF
           ls -lh www/
-          echo "Using REAL game from www/index.html - ZEROED"
+          echo "Real game check - index.html size:"
+          wc -c www/index.html
 
       - uses: actions/setup-node@v4
         with: {node-version: 20}
@@ -33,34 +34,34 @@ jobs:
           yes | sdkmanager --licenses || true
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Create or Reuse Keystore - PERSISTENT
+      - name: Prepare Keystore - PERSISTENT AT ROOT
         run: |
-          mkdir -p android/app
-          # Agar repo me pehle se keystore hai to use karo, nahi to naya banao
-          if [ -f "android/app/release.keystore" ]; then
-            echo "Using existing keystore from repo"
+          # Keystore ko root pe rakhenge taaki android delete hone pe bhi bache
+          if [ -f "release.keystore" ]; then
+            echo "Found existing keystore at root, reusing"
           else
-            echo "Creating NEW persistent keystore"
-            keytool -genkey -v -keystore android/app/release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
+            echo "Creating new persistent keystore at root"
+            keytool -genkey -v -keystore release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
           fi
-          # Certificate nikalo jo Play Console me upload karna hai
-          keytool -export -rfc -keystore android/app/release.keystore -alias kesarmal -storepass 123456 -file upload_certificate.pem
-          echo "=== SHA1 ==="
-          keytool -list -v -keystore android/app/release.keystore -alias kesarmal -storepass 123456 | grep SHA1
-          cat upload_certificate.pem
+          # Certificate for Play Console reset
+          keytool -export -rfc -keystore release.keystore -alias kesarmal -storepass 123456 -file upload_certificate.pem
+          keytool -list -v -keystore release.keystore -alias kesarmal -storepass 123456 | grep -E "SHA1|SHA256"
+          ls -lh release.keystore upload_certificate.pem
 
-      - name: Build AAB with Persistent Key
+      - name: Build AAB - Clean Android First
         run: |
+          # Purana android folder hata do - isiliye error aa raha tha
+          rm -rf android
           npm install
           npx cap add android
           npx cap sync android
+          # Ab root wala keystore android me copy karo
+          cp release.keystore android/app/release.keystore
           echo "android.suppressUnsupportedCompileSdk=35" >> android/gradle.properties
           sed -i 's/compileSdkVersion = .*/compileSdkVersion = 35/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 35/' android/variables.gradle
-          sed -i 's/versionCode .*/versionCode 3/' android/app/build.gradle || true
-          sed -i 's/versionName .*/versionName "1.2"/' android/app/build.gradle || true
-          # Copy keystore to correct place
-          cp android/app/release.keystore android/app/release.keystore 2>/dev/null || true
+          sed -i 's/versionCode .*/versionCode 4/' android/app/build.gradle || true
+          sed -i 's/versionName .*/versionName "1.3"/' android/app/build.gradle || true
           python3 << 'PY'
           import pathlib
           p=pathlib.Path("android/app/build.gradle")
@@ -73,13 +74,14 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew bundleRelease
+          echo "=== AAB READY ==="
           ls -lh app/build/outputs/bundle/release/
 
       - name: Upload AAB and Certificate
         uses: actions/upload-artifact@v4
         with:
-          name: FIXED-AAB-and-Certificate
+          name: FINAL-FIXED-AAB-v1.3
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             upload_certificate.pem
-            android/app/release.keystore
+            release.keystore
