@@ -1,4 +1,4 @@
-name: FINAL - KesarmalInnovations MergeEvolution
+name: FINAL - KesarmalInnovations MergeEvolution - REAL GAME
 on: [push, workflow_dispatch]
 jobs:
   build:
@@ -7,32 +7,29 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup Game Config - LOCKED PACKAGE
         run: |
-          echo "PACKAGE: com.kesarmalinnovations.mergeevolution - LOCKED FOREVER"
+          echo "PACKAGE: com.kesarmalinnovations.mergeevolution - REAL GAME"
           cat > package.json << 'EOF'
-          {"name":"merge-evolution-pro","version":"1.0.0","private":true,"dependencies":{"@capacitor/core":"^6.2.0","@capacitor/cli":"^6.2.0","@capacitor/android":"^6.2.0"}}
+          {"name":"merge-evolution-pro","version":"1.1.0","private":true,"dependencies":{"@capacitor/core":"^6.2.0","@capacitor/cli":"^6.2.0","@capacitor/android":"^6.2.0"}}
           EOF
           cat > capacitor.config.json << 'EOF'
           {
-            "appId": "com.kesarmalinnovations.mergeevolution",
+            "appId": "com.kesarmallinnovations.mergeevolution",
             "appName": "Merge Evolution PRO",
             "webDir": "www",
             "bundledWebRuntime": false
           }
           EOF
-          mkdir -p www
-          echo '<html><body style="background:#0a0a0a;color:#00ff88;text-align:center;padding:60px;font-family:sans-serif"><h1>Merge Evolution PRO</h1><h2>com.kesarmalinnovations.mergeevolution</h2><p>API 35 - FINAL LOCKED</p></body></html>' > www/index.html
-
+          ls -lh www/
+          echo "Using REAL game from www/index.html"
       - uses: actions/setup-node@v4
         with: {node-version: 20}
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: 21}
       - uses: android-actions/setup-android@v3
-
       - name: Install Android SDK 35
         run: |
           yes | sdkmanager --licenses || true
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
-
       - name: Build AAB - API 35 + Locked Keystore
         run: |
           npm install
@@ -41,6 +38,8 @@ jobs:
           echo "android.suppressUnsupportedCompileSdk=35" >> android/gradle.properties
           sed -i 's/compileSdkVersion = .*/compileSdkVersion = 35/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 35/' android/variables.gradle
+          sed -i 's/versionCode .*/versionCode 2/' android/app/build.gradle || true
+          sed -i 's/versionName .*/versionName "1.1"/' android/app/build.gradle || true
           cd android
           keytool -genkey -v -keystore app/release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
           python3 << 'PY'
@@ -54,10 +53,7 @@ jobs:
           PY
           chmod +x gradlew
           ./gradlew bundleRelease
-          echo "=== FINAL AAB READY ==="
-          ls -lh app/build/outputs/bundle/release/app-release.aab
-
       - uses: actions/upload-artifact@v4
         with:
-          name: FINAL-com.kesarmalinnovations.mergeevolution-AAB
+          name: FINAL-REAL-GAME-AAB-v1.1
           path: android/app/build/outputs/bundle/release/app-release.aab
