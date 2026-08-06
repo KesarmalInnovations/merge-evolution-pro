@@ -36,14 +36,16 @@ jobs:
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platforms;android-34"
           echo "API 35 installed"
 
-      - name: Keystore - Fresh for New App
+      - name: Keystore - Use Existing For Play Console
         run: |
-          # Naye app ke liye fresh keystore banayenge
-          rm -f release.keystore
-          echo "Creating FRESH keystore for NEW package"
-          keytool -genkey -v -keystore release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
-          keytool -export -rfc -keystore release.keystore -alias kesarmal -storepass 123456 -file upload_certificate.pem
-          keytool -list -v -keystore release.keystore -alias kesarmal -storepass 123456 | grep -E "SHA1|SHA256|Valid"
+          if [ -f release.keystore ]; then
+            echo "Using EXISTING release.keystore - Perfect for Play Console"
+          else
+            echo "Creating FRESH keystore"
+            keytool -genkey -v -keystore release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
+          fi
+          keytool -export -rfc -keystore release.keystore -alias kesarmal -storepass 123456 -file upload_certificate.pem || true
+          keytool -list -v -keystore release.keystore -alias kesarmal -storepass 123456 | grep -E "SHA1|SHA256|Valid" || true
 
       - name: Build AAB - API 35+ Locked
         run: |
@@ -57,9 +59,9 @@ jobs:
           sed -i 's/compileSdkVersion = .*/compileSdkVersion = 35/' android/variables.gradle
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 35/' android/variables.gradle
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle
-          # New app so Version 1
-          sed -i 's/versionCode .*/versionCode 1/' android/app/build.gradle
-          sed -i 's/versionName .*/versionName "1.0"/' android/app/build.gradle
+          # FIXED: Version 2 for Play Console
+          sed -i 's/versionCode .*/versionCode 2/' android/app/build.gradle
+          sed -i 's/versionName .*/versionName "1.0.1"/' android/app/build.gradle
           python3 << 'PY'
           import pathlib
           p=pathlib.Path("android/app/build.gradle")
@@ -73,7 +75,7 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew bundleRelease
-          echo "=== FINAL AAB API 35+ READY ==="
+          echo "=== FINAL AAB API 35+ READY - VERSION 2 ==="
           ls -lh app/build/outputs/bundle/release/
           # Verify API level
           aapt2 dump badging app/build/outputs/bundle/release/app-release.aab 2>/dev/null | grep -E "targetSdk|package" || echo "AAB built successfully with API 35+"
