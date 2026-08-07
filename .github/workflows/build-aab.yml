@@ -23,48 +23,38 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Android SDK 36
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 36
         run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-          sdkmanager --install "platforms;android-36"
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          sdkmanager --list | grep 36 || true
 
       - name: Install Cordova
         run: npm install -g cordova
 
       - name: Build AAB with API 36
         run: |
-          # www ko cordova project me copy
           cordova create app com.kesarmal.mergeevolutionpro "Merge Evolution PRO"
           cp -r www/* app/www/
           cp release.keystore app/
           cd app
           cordova platform add android@13.0.0
           
-          # YAHI MAIN FIX HAI - API 36 FORCE
-          echo "Forcing Target SDK 36..."
-          sed -i 's/compileSdkVersion.*/compileSdkVersion 36/g' platforms/android/app/build.gradle || true
-          sed -i 's/targetSdkVersion.*/targetSdkVersion 36/g' platforms/android/app/build.gradle || true
-          sed -i 's/compileSdk 33/compileSdk 36/g' platforms/android/app/build.gradle || true
-          sed -i 's/compileSdk 34/compileSdk 36/g' platforms/android/app/build.gradle || true
-          sed -i 's/compileSdk 35/compileSdk 36/g' platforms/android/app/build.gradle || true
-          sed -i 's/targetSdk 33/targetSdk 36/g' platforms/android/app/build.gradle || true
-          sed -i 's/targetSdk 34/targetSdk 36/g' platforms/android/app/build.gradle || true
-          sed -i 's/targetSdk 35/targetSdk 36/g' platforms/android/app/build.gradle || true
+          # FIX API 36 - main fix
+          echo "Forcing API 36..."
+          find platforms/android -name "build.gradle" -exec sed -i 's/compileSdkVersion.*/compileSdkVersion 36/g' {} \; || true
+          find platforms/android -name "build.gradle" -exec sed -i 's/targetSdkVersion.*/targetSdkVersion 36/g' {} \; || true
+          find platforms/android -name "build.gradle" -exec sed -i 's/compileSdk 3./compileSdk 36/g' {} \; || true
+          find platforms/android -name "build.gradle" -exec sed -i 's/targetSdk 3./targetSdk 36/g' {} \; || true
           
-          # Version Code badhao (pichla 2 tha)
+          # versionCode 2 -> 3
           sed -i 's/versionCode.*/versionCode 3/g' platforms/android/app/build.gradle || true
-
-          # Config.xml me bhi force
+          
           echo '<preference name="android-targetSdkVersion" value="36" />' >> config.xml
-          echo '<preference name="android-compileSdkVersion" value="36" />' >> config.xml
-
-          # AAB Build
+          
           cordova build android --release -- --packageType=bundle
-
-      - name: Sign AAB
-        working-directory: ./app
-        run: |
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA256 -keystore release.keystore -storepass ${{ secrets.KEYSTORE_PASSWORD || '123456' }} platforms/android/app/build/outputs/bundle/release/app-release.aab alias_name || echo "Manual sign needed, uploading unsigned for check"
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
