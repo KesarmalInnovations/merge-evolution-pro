@@ -1,89 +1,73 @@
-name: FINAL OPTION 1 - API 35+ New Package
-on: [push, workflow_dispatch]
+name: Build AAB API 36
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Game - REAL ZEROED + NEW PACKAGE
-        run: |
-          echo "NEW PACKAGE: com.kesarmalinnovations.mergeevolutionpro - API 35+"
-          cat > package.json << 'EOF'
-          {"name":"merge-evolution-pro","version":"1.0.0","private":true,"dependencies":{"@capacitor/core":"^6.2.0","@capacitor/cli":"^6.2.0","@capacitor/android":"^6.2.0"}}
-          EOF
-          cat > capacitor.config.json << 'EOF'
-          {
-            "appId": "com.kesarmalinnovations.mergeevolutionpro",
-            "appName": "Merge Evolution PRO",
-            "webDir": "www",
-            "bundledWebRuntime": false
-          }
-          EOF
-          echo "Package: com.kesarmalinnovations.mergeevolutionpro"
-          echo "Game size:"
-          ls -lh www/index.html
-
-      - uses: actions/setup-node@v4
-        with: {node-version: 20}
-      - uses: actions/setup-java@v4
-        with: {distribution: temurin, java-version: 21}
-      - uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK 35 - API 35+
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platforms;android-34"
-          echo "API 35 installed"
-
-      - name: Keystore - Use Existing For Play Console
-        run: |
-          if [ -f release.keystore ]; then
-            echo "Using EXISTING release.keystore - Perfect for Play Console"
-          else
-            echo "Creating FRESH keystore"
-            keytool -genkey -v -keystore release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
-          fi
-          keytool -export -rfc -keystore release.keystore -alias kesarmal -storepass 123456 -file upload_certificate.pem || true
-          keytool -list -v -keystore release.keystore -alias kesarmal -storepass 123456 | grep -E "SHA1|SHA256|Valid" || true
-
-      - name: Build AAB - API 35+ Locked
-        run: |
-          rm -rf android
-          npm install
-          npx cap add android
-          npx cap sync android
-          cp release.keystore android/app/release.keystore
-          echo "android.suppressUnsupportedCompileSdk=35" >> android/gradle.properties
-          # Force API 35
-          sed -i 's/compileSdkVersion = .*/compileSdkVersion = 35/' android/variables.gradle
-          sed -i 's/targetSdkVersion = .*/targetSdkVersion = 35/' android/variables.gradle
-          sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle
-          # FIXED: Version 2 for Play Console
-          sed -i 's/versionCode .*/versionCode 2/' android/app/build.gradle
-          sed -i 's/versionName .*/versionName "1.0.1"/' android/app/build.gradle
-          python3 << 'PY'
-          import pathlib
-          p=pathlib.Path("android/app/build.gradle")
-          s=p.read_text()
-          if "signingConfigs" not in s:
-              s=s.replace("buildTypes {", 'signingConfigs {\n        release {\n            storeFile file("release.keystore")\n            storePassword "123456"\n            keyAlias "kesarmal"\n            keyPassword "123456"\n        }\n    }\n    buildTypes {')
-          s=s.replace("minifyEnabled false", "minifyEnabled false\n            signingConfig signingConfigs.release")
-          p.write_text(s)
-          print("build.gradle fixed for API 35+")
-          PY
-          cd android
-          chmod +x gradlew
-          ./gradlew bundleRelease
-          echo "=== FINAL AAB API 35+ READY - VERSION 2 ==="
-          ls -lh app/build/outputs/bundle/release/
-          # Verify API level
-          aapt2 dump badging app/build/outputs/bundle/release/app-release.aab 2>/dev/null | grep -E "targetSdk|package" || echo "AAB built successfully with API 35+"
-
-      - uses: actions/upload-artifact@v4
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-          name: FINAL-API35-NEWPACKAGE-PRO
-          path: |
-            android/app/build/outputs/bundle/release/app-release.aab
-            release.keystore
-            upload_certificate.pem
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Android SDK 36
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          sdkmanager --install "platforms;android-36"
+
+      - name: Install Cordova
+        run: npm install -g cordova
+
+      - name: Build AAB with API 36
+        run: |
+          # www ko cordova project me copy
+          cordova create app com.kesarmal.mergeevolutionpro "Merge Evolution PRO"
+          cp -r www/* app/www/
+          cp release.keystore app/
+          cd app
+          cordova platform add android@13.0.0
+          
+          # YAHI MAIN FIX HAI - API 36 FORCE
+          echo "Forcing Target SDK 36..."
+          sed -i 's/compileSdkVersion.*/compileSdkVersion 36/g' platforms/android/app/build.gradle || true
+          sed -i 's/targetSdkVersion.*/targetSdkVersion 36/g' platforms/android/app/build.gradle || true
+          sed -i 's/compileSdk 33/compileSdk 36/g' platforms/android/app/build.gradle || true
+          sed -i 's/compileSdk 34/compileSdk 36/g' platforms/android/app/build.gradle || true
+          sed -i 's/compileSdk 35/compileSdk 36/g' platforms/android/app/build.gradle || true
+          sed -i 's/targetSdk 33/targetSdk 36/g' platforms/android/app/build.gradle || true
+          sed -i 's/targetSdk 34/targetSdk 36/g' platforms/android/app/build.gradle || true
+          sed -i 's/targetSdk 35/targetSdk 36/g' platforms/android/app/build.gradle || true
+          
+          # Version Code badhao (pichla 2 tha)
+          sed -i 's/versionCode.*/versionCode 3/g' platforms/android/app/build.gradle || true
+
+          # Config.xml me bhi force
+          echo '<preference name="android-targetSdkVersion" value="36" />' >> config.xml
+          echo '<preference name="android-compileSdkVersion" value="36" />' >> config.xml
+
+          # AAB Build
+          cordova build android --release -- --packageType=bundle
+
+      - name: Sign AAB
+        working-directory: ./app
+        run: |
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA256 -keystore release.keystore -storepass ${{ secrets.KEYSTORE_PASSWORD || '123456' }} platforms/android/app/build/outputs/bundle/release/app-release.aab alias_name || echo "Manual sign needed, uploading unsigned for check"
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-api36
+          path: app/platforms/android/app/build/outputs/bundle/release/*.aab
