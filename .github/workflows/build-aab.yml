@@ -29,7 +29,6 @@ jobs:
       - name: Install Android 36
         run: |
           sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-          sdkmanager --list | grep 36 || true
 
       - name: Install Cordova
         run: npm install -g cordova
@@ -38,22 +37,19 @@ jobs:
         run: |
           cordova create app com.kesarmal.mergeevolutionpro "Merge Evolution PRO"
           cp -r www/* app/www/
-          cp release.keystore app/
+          cp release.keystore app/ || true
           cd app
           cordova platform add android@13.0.0
           
-          # FIX API 36 - main fix
-          echo "Forcing API 36..."
-          find platforms/android -name "build.gradle" -exec sed -i 's/compileSdkVersion.*/compileSdkVersion 36/g' {} \; || true
-          find platforms/android -name "build.gradle" -exec sed -i 's/targetSdkVersion.*/targetSdkVersion 36/g' {} \; || true
-          find platforms/android -name "build.gradle" -exec sed -i 's/compileSdk 3./compileSdk 36/g' {} \; || true
-          find platforms/android -name "build.gradle" -exec sed -i 's/targetSdk 3./targetSdk 36/g' {} \; || true
+          echo "Fixing to API 36..."
+          # compileSdk aur targetSdk ko 36 pe force
+          sed -i 's/compileSdkVersion.*/    compileSdkVersion 36/' platforms/android/app/build.gradle
+          sed -i 's/targetSdkVersion.*/    targetSdkVersion 36/' platforms/android/app/build.gradle
+          sed -i 's/compileSdk 34/compileSdk 36/g; s/compileSdk 33/compileSdk 36/g; s/compileSdk 35/compileSdk 36/g' platforms/android/app/build.gradle
+          sed -i 's/targetSdk 34/targetSdk 36/g; s/targetSdk 33/targetSdk 36/g; s/targetSdk 35/targetSdk 36/g' platforms/android/app/build.gradle
+          sed -i 's/versionCode .*/versionCode 3/' platforms/android/app/build.gradle || true
           
-          # versionCode 2 -> 3
-          sed -i 's/versionCode.*/versionCode 3/g' platforms/android/app/build.gradle || true
-          
-          echo '<preference name="android-targetSdkVersion" value="36" />' >> config.xml
-          
+          # Build bundle
           cordova build android --release -- --packageType=bundle
 
       - name: Upload AAB
