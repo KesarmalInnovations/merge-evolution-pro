@@ -19,6 +19,12 @@ jobs:
           node-version: '20'
       - uses: android-actions/setup-android@v3
       - run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      
+      - name: Check Keystore Alias
+        run: |
+          echo "Listing keystore..."
+          keytool -list -v -keystore release.keystore -storepass ${{ secrets.KEYSTORE_PASSWORD }} | grep -A2 "Alias"
+      
       - run: npm install -g cordova
 
       - name: Build Signed AAB API 36
@@ -46,8 +52,8 @@ jobs:
           cordova platform add android@13.0.0
           sed -i 's/compileSdkVersion.*/    compileSdkVersion 36/' platforms/android/app/build.gradle
           sed -i 's/targetSdkVersion.*/    targetSdkVersion 36/' platforms/android/app/build.gradle
-          sed -i 's/compileSdk 34/compileSdk 36/g; s/compileSdk 35/compileSdk 36/g' platforms/android/app/build.gradle
-          sed -i 's/targetSdk 34/targetSdk 36/g; s/targetSdk 35/targetSdk 36/g' platforms/android/app/build.gradle
+          sed -i 's/compileSdk 34/compileSdk 36/g' platforms/android/app/build.gradle
+          sed -i 's/targetSdk 34/targetSdk 36/g' platforms/android/app/build.gradle
           sed -i 's/versionCode .*/versionCode 3/' platforms/android/app/build.gradle
           cordova build android --release --buildConfig=build.json -- --packageType=bundle
 
