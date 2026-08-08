@@ -19,44 +19,42 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Fix Keystore & Recreate Android if gradlew missing
+      - name: Decode Keystore
         run: |
-          ls -la
-          echo "--- android folder ---"
-          ls -la android || echo "no android folder"
-          
           mkdir -p android/app
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
           else
             cp release.keystore android/app/upload-keystore.jks || true
-            cp release.keystore android/app/release.keystore || true
+          fi
+
+      - name: Fix Kotlin Duplicate Class Error
+        run: |
+          echo "Fixing kotlin version conflict..."
+          # 1. Force kotlin 1.8.22 in android/build.gradle
+          if [ -f "android/build.gradle" ]; then
+            sed -i "s/.*kotlin_version.*=.*'.*'/    ext.kotlin_version = '1.8.22'/" android/build.gradle || true
+            sed -i "s/.*kotlin_version.*=.*\".*\".*/    ext.kotlin_version = '1.8.22'/" android/build.gradle || true
           fi
           
-          # gradlew missing hai toh naya android banao
-          if [ ! -f "android/gradlew" ]; then
-            echo "gradlew missing - recreating android platform..."
-            rm -rf android
-            if [ ! -f "package.json" ]; then
-              npm init -y
-              npm install @capacitor/core @capacitor/cli @capacitor/android
-              npx cap init "Merge Evolution PRO" com.kesarmallinnovations.mergeevolutionpro --web-dir=www
-            else
-              npm install
+          # 2. Add resolutionStrategy to force same version
+          for f in android/build.gradle android/app/build.gradle; do
+            if [ -f "$f" ]; then
+              if ! grep -q "resolutionStrategy" "$f"; then
+                echo "" >> "$f"
+                echo "configurations.all { resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'; force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'; force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22' } }" >> "$f"
+              fi
             fi
-            npx cap add android
-            npx cap copy android || true
-            # keystore wapas copy
-            mkdir -p android/app
-            cp release.keystore android/app/upload-keystore.jks || true
-          fi
+          done
           
-          ls -la android/
-          chmod +x android/gradlew || true
+          # 3. Clean
+          rm -rf ~/.gradle/caches || true
 
       - name: Build AAB V8
         run: |
           cd android
+          chmod +x gradlew
+          ./gradlew clean
           ./gradlew bundleRelease --no-daemon -x test
 
       - name: Find AAB
@@ -68,4 +66,3 @@ jobs:
           name: app-release-v8
           path: |
             **/*.aab
-            android/app/build/outputs/bundle/release/*.aab
