@@ -1,4 +1,4 @@
-name: FINAL FIXED - API 36 - Version 6 - Valid Signature FIX
+name: FINAL FIXED V3 - API 36 - Version 6 - Keystore Fix
 on: [push, workflow_dispatch]
 jobs:
   build:
@@ -8,7 +8,7 @@ jobs:
 
       - name: Setup Game - API 36 Version 6
         run: |
-          echo "PACKAGE: com.kesarmalinnovations.mergeevolutionpro - API 36 - V6 FIXED"
+          echo "PACKAGE: com.kesarmalinnovations.mergeevolutionpro - API 36 - V6 FIX V3"
           cat > package.json << 'EOF'
           {"name":"merge-evolution-pro","version":"1.0.0","private":true,"dependencies":{"@capacitor/core":"^6.2.0","@capacitor/cli":"^6.2.0","@capacitor/android":"^6.2.0"}}
           EOF
@@ -21,7 +21,6 @@ jobs:
           }
           EOF
           ls -lh www/
-          wc -c www/index.html
 
       - uses: actions/setup-node@v4
         with: {node-version: 20}
@@ -34,7 +33,7 @@ jobs:
           yes | sdkmanager --licenses || true
           sdkmanager --install "platforms;android-36" "build-tools;36.0.0" || true
 
-      - name: Build AAB - API 36 + V6 + Signature FIXED
+      - name: Build AAB - API 36 + V6 + Keystore FIX V3
         run: |
           npm install
           npx cap add android
@@ -48,33 +47,36 @@ jobs:
           
           cd android
           
-          # Keystore ko sahi jagah pe banao - dono jagah
           mkdir -p app
           mkdir -p app/app
           
+          # Keystore fix - no self-copy
           if [ -f "../release.keystore" ]; then
-            echo "Using existing keystore from root"
-            cp ../release.keystore app/release.keystore
-            cp ../release.keystore app/app/release.keystore
-            cp ../release.keystore ../release.keystore
+            echo "Found existing keystore at root"
+            cp ../release.keystore app/release.keystore || true
+            cp ../release.keystore app/app/release.keystore || true
+          elif [ -f "app/release.keystore" ]; then
+            echo "Found keystore in app folder"
+            cp app/release.keystore app/app/release.keystore || true
+            cp app/release.keystore ../release.keystore || true
           else
             echo "Creating NEW keystore"
             keytool -genkey -v -keystore app/release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
-            cp app/release.keystore app/app/release.keystore
-            cp app/release.keystore ../release.keystore
+            cp app/release.keystore app/app/release.keystore || true
+            cp app/release.keystore ../release.keystore || true
           fi
           
           ls -lh app/release.keystore
-          ls -lh app/app/release.keystore
+          ls -lh app/app/release.keystore || echo "app/app not needed"
+          ls -lh ../release.keystore
           
-          # Build with correct signing path - ABSOLUTE PATH use karenge
+          # Build with absolute path
           ./gradlew bundleRelease -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore -Pandroid.injected.signing.store.password=123456 -Pandroid.injected.signing.key.alias=kesarmal -Pandroid.injected.signing.key.password=123456
           
-          echo "Build success - V6 API36"
           ls -lh app/build/outputs/bundle/release/
           
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: FINAL-REAL-GAME-AAB-VERSION-6-API36-FIXED
+          name: FINAL-REAL-GAME-AAB-VERSION-6-API36-FIXED-V3
           path: android/app/build/outputs/bundle/release/*.aab
