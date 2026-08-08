@@ -19,40 +19,48 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Decode Keystore
+      - name: Fix Keystore & Recreate Android if gradlew missing
         run: |
+          ls -la
+          echo "--- android folder ---"
+          ls -la android || echo "no android folder"
+          
           mkdir -p android/app
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
           else
-            cp release.keystore android/app/upload-keystore.jks
+            cp release.keystore android/app/upload-keystore.jks || true
+            cp release.keystore android/app/release.keystore || true
           fi
-
-      - name: Build - Auto Detect
-        run: |
-          ls -la
-          echo "--- checking project type ---"
-          if [ -f "pubspec.yaml" ]; then
-            echo "Flutter found"
-            flutter pub get
-            flutter build appbundle --release --build-number=8 --build-name=1.0.2
-          elif [ -f "package.json" ]; then
-            echo "NPM/Capacitor found"
-            npm install
-            npx cap sync || true
-            if [ -d "android" ]; then
-              cd android && chmod +x gradlew && ./gradlew bundleRelease
+          
+          # gradlew missing hai toh naya android banao
+          if [ ! -f "android/gradlew" ]; then
+            echo "gradlew missing - recreating android platform..."
+            rm -rf android
+            if [ ! -f "package.json" ]; then
+              npm init -y
+              npm install @capacitor/core @capacitor/cli @capacitor/android
+              npx cap init "Merge Evolution PRO" com.kesarmallinnovations.mergeevolutionpro --web-dir=www
+            else
+              npm install
             fi
-          elif [ -d "android" ]; then
-            echo "Android folder found"
-            cd android && chmod +x gradlew && ./gradlew bundleRelease
-          else
-            echo "No Flutter/No NPM - checking www"
-            ls -la www
+            npx cap add android
+            npx cap copy android || true
+            # keystore wapas copy
+            mkdir -p android/app
+            cp release.keystore android/app/upload-keystore.jks || true
           fi
+          
+          ls -la android/
+          chmod +x android/gradlew || true
+
+      - name: Build AAB V8
+        run: |
+          cd android
+          ./gradlew bundleRelease --no-daemon -x test
 
       - name: Find AAB
-        run: find . -name "*.aab" -type f -ls
+        run: find . -name "*.aab" -type f
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
@@ -60,4 +68,4 @@ jobs:
           name: app-release-v8
           path: |
             **/*.aab
-          if-no-files-found: warn
+            android/app/build/outputs/bundle/release/*.aab
