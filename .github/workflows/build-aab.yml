@@ -1,4 +1,4 @@
-name: FINAL - API 36 - Version 6 - Level10 + Offline Fix
+name: FINAL FIXED - API 36 - Version 6 - Valid Signature FIX
 on: [push, workflow_dispatch]
 jobs:
   build:
@@ -6,9 +6,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Game Config - API 36 + Version 6
+      - name: Setup Game - API 36 Version 6
         run: |
-          echo "PACKAGE: com.kesarmalinnovations.mergeevolutionpro - API 36 - VERSION 6"
+          echo "PACKAGE: com.kesarmalinnovations.mergeevolutionpro - API 36 - V6 FIXED"
           cat > package.json << 'EOF'
           {"name":"merge-evolution-pro","version":"1.0.0","private":true,"dependencies":{"@capacitor/core":"^6.2.0","@capacitor/cli":"^6.2.0","@capacitor/android":"^6.2.0"}}
           EOF
@@ -20,7 +20,6 @@ jobs:
             "bundledWebRuntime": false
           }
           EOF
-          echo "Using REAL fixed game from www/index.html - Version 6"
           ls -lh www/
           wc -c www/index.html
 
@@ -30,49 +29,52 @@ jobs:
         with: {distribution: temurin, java-version: 21}
       - uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK 36 - API 36
+      - name: Install Android SDK 36
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platforms;android-35" || true
-          echo "API 36 installed"
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" || true
 
-      - name: Build AAB - API 36 + Version 6 + Valid Signature
+      - name: Build AAB - API 36 + V6 + Signature FIXED
         run: |
           npm install
           npx cap add android
           npx cap sync android
+          
           echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
           sed -i 's/compileSdkVersion = .*/compileSdkVersion = 36/' android/variables.gradle || true
-          sed -i 's/compileSdk .*/compileSdk 36/' android/variables.gradle || true
           sed -i 's/targetSdkVersion = .*/targetSdkVersion = 36/' android/variables.gradle || true
-          sed -i 's/targetSdk .*/targetSdk 36/' android/variables.gradle || true
           sed -i 's/versionCode .*/versionCode 6/' android/app/build.gradle || true
           sed -i 's/versionName .*/versionName "1.0.0"/' android/app/build.gradle || true
-          # Also patch build.gradle if needed
-          sed -i 's/compileSdkVersion .*/compileSdkVersion 36/' android/app/build.gradle || true
-          sed -i 's/targetSdkVersion .*/targetSdkVersion 36/' android/app/build.gradle || true
           
           cd android
-          # Use persistent keystore if exists, else create new
+          
+          # Keystore ko sahi jagah pe banao - dono jagah
+          mkdir -p app
+          mkdir -p app/app
+          
           if [ -f "../release.keystore" ]; then
-            echo "Using existing release.keystore from root"
+            echo "Using existing keystore from root"
             cp ../release.keystore app/release.keystore
-          elif [ -f "app/release.keystore" ]; then
-            echo "Using existing keystore from app folder"
+            cp ../release.keystore app/app/release.keystore
+            cp ../release.keystore ../release.keystore
           else
-            echo "Creating NEW keystore - SAVE THIS FOR FUTURE"
+            echo "Creating NEW keystore"
             keytool -genkey -v -keystore app/release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
-            cp app/release.keystore ../release.keystore || true
+            cp app/release.keystore app/app/release.keystore
+            cp app/release.keystore ../release.keystore
           fi
           
-          # Sign and build
-          ./gradlew bundleRelease -Pandroid.injected.signing.store.file=app/release.keystore -Pandroid.injected.signing.store.password=123456 -Pandroid.injected.signing.key.alias=kesarmal -Pandroid.injected.signing.key.password=123456
+          ls -lh app/release.keystore
+          ls -lh app/app/release.keystore
           
-          echo "Build complete - Version 6 - API 36"
+          # Build with correct signing path - ABSOLUTE PATH use karenge
+          ./gradlew bundleRelease -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore -Pandroid.injected.signing.store.password=123456 -Pandroid.injected.signing.key.alias=kesarmal -Pandroid.injected.signing.key.password=123456
+          
+          echo "Build success - V6 API36"
           ls -lh app/build/outputs/bundle/release/
           
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: FINAL-REAL-GAME-AAB-VERSION-6-API36
+          name: FINAL-REAL-GAME-AAB-VERSION-6-API36-FIXED
           path: android/app/build/outputs/bundle/release/*.aab
