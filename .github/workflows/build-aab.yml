@@ -1,8 +1,7 @@
 name: Merge Evolution PRO - V8 Closed Testing API 36
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -10,57 +9,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0'
-          channel: 'stable'
       
-      - name: Decode Keystore
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies & Build AAB
         run: |
           mkdir -p android/app
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
           else
-            echo "Secret empty, using repo release.keystore"
             cp release.keystore android/app/upload-keystore.jks
           fi
-          ls -lh android/app/
-
-      - name: Create key.properties
-        run: |
-          echo "storeFile=upload-keystore.jks" > android/key.properties
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
-          echo "storeFile path fixed for local build"
-
-      - name: Fix AD_ID Permission
-        run: |
-          if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
-            if ! grep -q "com.google.android.gms.permission.AD_ID" android/app/src/main/AndroidManifest.xml; then
-              sed -i '/<manifest/a \    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml
-            fi
-          fi
-
-      - name: Pub Get
-        run: |
-          if [ -f "pubspec.yaml" ]; then flutter pub get; else echo "No pubspec, skip"; fi
-
-      - name: Build AAB V8
-        run: |
-          if [ -f "pubspec.yaml" ]; then
+          
+          # Check project type
+          ls -la
+          echo "--- www folder ---"
+          ls -la www || echo "no www"
+          
+          if [ -f "package.json" ]; then
+            npm install
+            npx cap add android || true
+            npx cap copy
+            npx cap sync
+            cd android
+            chmod +x gradlew
+            ./gradlew bundleRelease --build-cache
+          elif [ -f "pubspec.yaml" ]; then
+            flutter pub get
             flutter build appbundle --release --build-number=8 --build-name=1.0.2
-          else
-            echo "Flutter project not found in root, checking www..."
-            ls -R
           fi
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-v8-API36-Closed
-          path: build/app/outputs/bundle/release/app-release.aab
+          name: app-release-v8
+          path: |
+            **/*.aab
+            android/app/build/outputs/**/*.aab
+            build/app/outputs/bundle/release/*.aab
+          if-no-files-found: warn
