@@ -14,12 +14,13 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-      
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
-      - name: Install Dependencies & Build AAB
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: 'stable'
+
+      - name: Decode Keystore
         run: |
           mkdir -p android/app
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
@@ -27,31 +28,29 @@ jobs:
           else
             cp release.keystore android/app/upload-keystore.jks
           fi
-          
-          # Check project type
-          ls -la
-          echo "--- www folder ---"
-          ls -la www || echo "no www"
-          
-          if [ -f "package.json" ]; then
-            npm install
-            npx cap add android || true
-            npx cap copy
-            npx cap sync
-            cd android
-            chmod +x gradlew
-            ./gradlew bundleRelease --build-cache
-          elif [ -f "pubspec.yaml" ]; then
-            flutter pub get
-            flutter build appbundle --release --build-number=8 --build-name=1.0.2
-          fi
+          ls -lh android/app/
+
+      - name: Create key.properties
+        run: |
+          echo "storeFile=upload-keystore.jks" > android/key.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+
+      - name: Pub Get
+        run: flutter pub get
+
+      - name: Build AAB V8
+        run: flutter build appbundle --release --build-number=8 --build-name=1.0.2
+
+      - name: List AAB
+        run: find . -name "*.aab" -type f | head -20
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: app-release-v8
           path: |
+            build/app/outputs/bundle/release/app-release.aab
+            **/app-release.aab
             **/*.aab
-            android/app/build/outputs/**/*.aab
-            build/app/outputs/bundle/release/*.aab
-          if-no-files-found: warn
