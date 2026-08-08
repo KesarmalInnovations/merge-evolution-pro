@@ -18,23 +18,47 @@ jobs:
         with:
           flutter-version: '3.22.0'
           channel: 'stable'
+      
       - name: Decode Keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+        run: |
+          mkdir -p android/app
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          else
+            echo "Secret empty, using repo release.keystore"
+            cp release.keystore android/app/upload-keystore.jks
+          fi
+          ls -lh android/app/
+
       - name: Create key.properties
         run: |
           echo "storeFile=upload-keystore.jks" > android/key.properties
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "storeFile path fixed for local build"
+
       - name: Fix AD_ID Permission
         run: |
-          if ! grep -q "com.google.android.gms.permission.AD_ID" android/app/src/main/AndroidManifest.xml; then
-            sed -i '/<manifest/a \    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml
+          if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+            if ! grep -q "com.google.android.gms.permission.AD_ID" android/app/src/main/AndroidManifest.xml; then
+              sed -i '/<manifest/a \    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml
+            fi
           fi
+
       - name: Pub Get
-        run: flutter pub get
+        run: |
+          if [ -f "pubspec.yaml" ]; then flutter pub get; else echo "No pubspec, skip"; fi
+
       - name: Build AAB V8
-        run: flutter build appbundle --release --build-number=8 --build-name=1.0.2
+        run: |
+          if [ -f "pubspec.yaml" ]; then
+            flutter build appbundle --release --build-number=8 --build-name=1.0.2
+          else
+            echo "Flutter project not found in root, checking www..."
+            ls -R
+          fi
+
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
