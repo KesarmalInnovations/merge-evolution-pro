@@ -14,11 +14,10 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-
-      - uses: subosito/flutter-action@v2
+      
+      - uses: actions/setup-node@v4
         with:
-          flutter-version: '3.22.0'
-          channel: 'stable'
+          node-version: '20'
 
       - name: Decode Keystore
         run: |
@@ -28,29 +27,37 @@ jobs:
           else
             cp release.keystore android/app/upload-keystore.jks
           fi
-          ls -lh android/app/
 
-      - name: Create key.properties
+      - name: Build - Auto Detect
         run: |
-          echo "storeFile=upload-keystore.jks" > android/key.properties
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          ls -la
+          echo "--- checking project type ---"
+          if [ -f "pubspec.yaml" ]; then
+            echo "Flutter found"
+            flutter pub get
+            flutter build appbundle --release --build-number=8 --build-name=1.0.2
+          elif [ -f "package.json" ]; then
+            echo "NPM/Capacitor found"
+            npm install
+            npx cap sync || true
+            if [ -d "android" ]; then
+              cd android && chmod +x gradlew && ./gradlew bundleRelease
+            fi
+          elif [ -d "android" ]; then
+            echo "Android folder found"
+            cd android && chmod +x gradlew && ./gradlew bundleRelease
+          else
+            echo "No Flutter/No NPM - checking www"
+            ls -la www
+          fi
 
-      - name: Pub Get
-        run: flutter pub get
-
-      - name: Build AAB V8
-        run: flutter build appbundle --release --build-number=8 --build-name=1.0.2
-
-      - name: List AAB
-        run: find . -name "*.aab" -type f | head -20
+      - name: Find AAB
+        run: find . -name "*.aab" -type f -ls
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: app-release-v8
           path: |
-            build/app/outputs/bundle/release/app-release.aab
-            **/app-release.aab
             **/*.aab
+          if-no-files-found: warn
