@@ -1,99 +1,51 @@
-name: FINAL V6 API36 AD_ID Permanent Fix
-on: [push, workflow_dispatch]
+name: Merge Evolution PRO - V8 Closed Testing API 36
+
+on:
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
-      - name: Setup Game Config
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: 'stable'
+
+      - name: Decode Keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+
+      - name: Create key.properties
         run: |
-          echo "PACKAGE: com.kesarmalinnovations.mergeevolutionpro - V6 API36 AD_ID FIX"
-          cat > package.json << 'EOF'
-          {"name":"merge-evolution-pro","version":"1.0.0","private":true,"dependencies":{"@capacitor/core":"^6.2.0","@capacitor/cli":"^6.2.0","@capacitor/android":"^6.2.0"}}
-          EOF
-          cat > capacitor.config.json << 'EOF'
-          {
-            "appId": "com.kesarmalinnovations.mergeevolutionpro",
-            "appName": "Merge Evolution PRO",
-            "webDir": "www",
-            "bundledWebRuntime": false
-          }
-          EOF
-          ls -lh www/index.html
+          echo "storeFile=upload-keystore.jks" > android/key.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
 
-      - uses: actions/setup-node@v4
-        with: {node-version: 20}
-      - uses: actions/setup-java@v4
-        with: {distribution: temurin, java-version: 21}
-      - uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK 36
+      - name: Fix AD_ID Permission for Ads (V7 Fix)
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platforms;android-35" || true
-
-      - name: Build AAB - V6 API36 AD_ID FIX
-        run: |
-          npm install
-          npx cap add android
-          npx cap sync android
-          
-          # --- FIX 1: API 36 + VERSION 6 ---
-          echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
-          sed -i 's/compileSdkVersion = .*/compileSdkVersion = 36/' android/variables.gradle || true
-          sed -i 's/compileSdk .*/compileSdk 36/' android/variables.gradle || true
-          sed -i 's/targetSdkVersion = .*/targetSdkVersion = 36/' android/variables.gradle || true
-          sed -i 's/targetSdk .*/targetSdk 36/' android/variables.gradle || true
-          sed -i 's/versionCode .*/versionCode 7/' android/app/build.gradle || true
-          sed -i 's/versionName .*/versionName "1.0.0"/' android/app/build.gradle || true
-          sed -i 's/compileSdkVersion .*/compileSdkVersion 36/' android/app/build.gradle || true
-          sed -i 's/targetSdkVersion .*/targetSdkVersion 36/' android/app/build.gradle || true
-
-          # --- FIX 2: AD_ID PERMISSION - PERMANENT FIX (Tu Yes kiya hai Play Console me) ---
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          echo "--- BEFORE AD_ID ---"
-          cat $MANIFEST
-          # Agar AD_ID pehle se nahi hai toh add karo
-          if ! grep -q "AD_ID" "$MANIFEST"; then
-            echo "Adding AD_ID permission..."
-            sed -i '/<manifest/a \    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' $MANIFEST
-          else
-            echo "AD_ID already exists, skipping"
+          if ! grep -q "com.google.android.gms.permission.AD_ID" android/app/src/main/AndroidManifest.xml; then
+            sed -i '/<manifest/a \    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml
           fi
-          echo "--- AFTER AD_ID ---"
-          cat $MANIFEST
-          grep -q "AD_ID" $MANIFEST && echo "✅ AD_ID FIX SUCCESS" || (echo "❌ AD_ID FIX FAILED" && exit 1)
+          cat android/app/src/main/AndroidManifest.xml | grep AD_ID
 
-          # --- FIX 3: Keystore with absolute path - no more app/app error ---
-          cd android
-          mkdir -p app
-          # 3 jagah check karo
-          if [ -f "../release.keystore" ]; then
-            echo "Found root keystore"
-            cp ../release.keystore app/release.keystore || true
-            cp ../release.keystore app/app/release.keystore 2>/dev/null || true
-            mkdir -p app/app 2>/dev/null || true
-            cp ../release.keystore app/app/release.keystore 2>/dev/null || true
-          fi
-          if [ ! -f "app/release.keystore" ]; then
-            echo "Creating fresh keystore"
-            keytool -genkey -v -keystore app/release.keystore -alias kesarmal -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=KesarmalInnovations, OU=Games, O=KesarmalInnovations, L=Delhi, S=Delhi, C=IN"
-            cp app/release.keystore ../release.keystore || true
-          fi
-          
-          ls -lh app/*.keystore || true
-          ls -lh app/app/*.keystore || true
+      - name: Pub Get
+        run: flutter pub get
 
-          # Build with full absolute path
-          STORE_PATH=$(pwd)/app/release.keystore
-          echo "Using keystore: $STORE_PATH"
-          ./gradlew bundleRelease -Pandroid.injected.signing.store.file=$STORE_PATH -Pandroid.injected.signing.store.password=123456 -Pandroid.injected.signing.key.alias=kesarmal -Pandroid.injected.signing.key.password=123456
-          
-          ls -lh app/build/outputs/bundle/release/
+      - name: Build AAB - V8 (1.0.2) API 36
+        run: flutter build appbundle --release --build-number=8 --build-name=1.0.2
 
-      - name: Upload AAB
+      - name: Upload AAB V8
         uses: actions/upload-artifact@v4
         with:
-          name: FINAL-V7-API36-ADID-FIXED-VALID
-          path: android/app/build/outputs/bundle/release/*.aab
+          name: app-release-v8-API36-Closed
+          path: build/app/outputs/bundle/release/app-release.aab
