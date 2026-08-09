@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -33,9 +33,7 @@ jobs:
         run: |
           npm install
           npm install -D typescript @capacitor/cli
-          
-          # --- FIX: Direct JSON create, no .ts ---
-          rm -f capacitor.config.ts capacitor.config.json
+          rm -f capacitor.config.ts
           cat > capacitor.config.json <<'JSON'
           {
             "appId": "com.kesarmalinnovations.mergeevolutionpro",
@@ -44,16 +42,18 @@ jobs:
             "bundledWebRuntime": false
           }
           JSON
-          cat capacitor.config.json
-          
           rm -rf android
           npx cap add android
           npx cap copy android
           
           echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" || true
-          sed -i "s/gradle-.*-all.zip/gradle-8.9-all.zip/" android/gradle/wrapper/gradle-wrapper.properties || true
+          
+          # API 36 + Java 21 Fix
+          sed -i "s/gradle-.*-all.zip/gradle-8.9-all.zip/" android/gradle/wrapper/gradle-wrapper.properties
           sed -i "s/compileSdkVersion.*/compileSdkVersion = 36/" android/variables.gradle || true
           sed -i "s/targetSdkVersion.*/targetSdkVersion = 36/" android/variables.gradle || true
+          echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
+          echo "android.suppressUnsupportedCompileSdk=36" >> android/app/gradle.properties 2>/dev/null || true
           
           mkdir -p android/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
