@@ -45,11 +45,16 @@ jobs:
           rm -rf android
           npx cap add android
           npx cap copy android
+          
           echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" || true
           sed -i "s/gradle-.*-all.zip/gradle-8.9-all.zip/" android/gradle/wrapper/gradle-wrapper.properties
           sed -i "s/compileSdkVersion.*/compileSdkVersion = 36/" android/variables.gradle || true
           sed -i "s/targetSdkVersion.*/targetSdkVersion = 36/" android/variables.gradle || true
           echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
+          
+          # --- VERSION CODE 8 ---
+          sed -i "s/versionCode .*/versionCode 8/" android/app/build.gradle
+          sed -i "s/versionName .*/versionName \"1.0.8\"/" android/app/build.gradle
           
           mkdir -p android/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
@@ -105,5 +110,5 @@ jobs:
           ./gradlew clean bundleRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: app-release-API36-SIGNED-FINAL
+          name: app-release-API36-SIGNED-V8-FINAL
           path: android/app/build/outputs/bundle/release/app-release.aab
