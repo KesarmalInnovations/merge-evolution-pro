@@ -14,16 +14,27 @@ jobs:
 
       - name: Auto Restore if package.json missing
         run: |
+          set -x
           ls -la
-          if [ ! -f "package.json" ]; then
-            echo "package.json missing, restoring..."
-            git checkout 3a024e8 -- package.json package-lock.json capacitor.config.json src public www 2>/dev/null || true
-            # agar phir bhi na mile to history se last wala le lo
-            if [ ! -f "package.json" ]; then
-              LAST=$(git log --all --pretty=format:%H -- package.json | head -1)
-              git checkout $LAST -- package.json package-lock.json 2>/dev/null || git checkout $LAST -- .
-            fi
+          if [ -f "package.json" ]; then
+            echo "package.json mil gaya"
+          else
+            echo "package.json missing hai, history se dhoondh raha hu..."
+            git log --oneline --all -30
+            GOOD=""
+            for C in $(git rev-list --all | head -100); do
+              if git ls-tree -r --name-only $C | grep -qx "package.json"; then
+                GOOD=$C
+                echo "Good commit mila: $GOOD"
+                break
+              fi
+            done
+            echo "Restoring from $GOOD"
+            cp .github/workflows/build-aab.yml /tmp/build-aab.yml
+            git checkout $GOOD -- .
+            cp /tmp/build-aab.yml .github/workflows/build-aab.yml
             ls -la
+            cat package.json | head -20
           fi
 
       - uses: actions/setup-java@v4
@@ -48,7 +59,6 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "storeFile=upload-keystore.jks" >> android/key.properties
           cp android/key.properties android/app/key.properties
-          sed -i "s/.*kotlin_version.*/    ext.kotlin_version = '1.8.22'/" android/build.gradle || true
           chmod +x android/gradlew
           cd android
           ./gradlew clean bundleRelease --no-daemon
