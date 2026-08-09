@@ -17,9 +17,17 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Check Files
+        run: |
+          pwd
+          ls -la
+          find . -maxdepth 3 -name "package.json"
+
       - name: Fresh Build
         run: |
           rm -rf android
+          ls -la
+          if [ ! -f "package.json" ]; then echo "package.json root pe nahi hai, dhoondh raha hu..." && ROOT=$(find . -name "package.json" -type f | head -n1 | xargs dirname) && cd $ROOT && pwd && ls -la; fi
           npm install
           npx cap add android
           npx cap copy android
