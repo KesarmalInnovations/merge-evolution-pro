@@ -1,0 +1,27 @@
+name: FIX - Restore Missing Files
+on: workflow_dispatch
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          git config user.name "Mobile Fix"
+          git config user.email "fix@mobile.com"
+          for C in $(git rev-list --all --topo-order); do
+            if git ls-tree -r --name-only $C | grep -qx "package.json"; then
+              echo "FOUND $C"
+              git checkout $C -- package.json package-lock.json 2>/dev/null || git show $C:package.json > package.json
+              git checkout $C -- capacitor.config.json capacitor.config.ts ionic.config.json 2>/dev/null || true
+              git checkout $C -- src www public 2>/dev/null || true
+              break
+            fi
+          done
+          ls -la
+          git add -A
+          git commit -m "Restore files from history - mobile fix" || echo "no commit"
+          git push
