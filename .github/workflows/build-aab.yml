@@ -12,30 +12,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Auto Restore if package.json missing
+      - name: Auto Restore
         run: |
-          ls -la
           if [ ! -f "package.json" ]; then
             GOOD=$(git log --all --pretty=format:%H -- package.json | head -1)
             echo "Restoring from $GOOD"
             cp .github/workflows/build-aab.yml /tmp/b.yml
-            git checkout $GOOD -- .
-            cp /tmp/b.yml .github/workflows/build-aab.yml
+            git checkout $GOOD -- . 2>/dev/null || true
+            cp /tmp/b.yml .github/workflows/build-aab.yml 2>/dev/null || true
           fi
           ls -la
-
-      - name: Fix Capacitor Config
-        run: |
-          cat capacitor.config.json 2>/dev/null || echo "config.json missing"
-          cat capacitor.config.ts 2>/dev/null || echo "config.ts missing"
-          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
-            npx cap init "Merge Evolution PRO" com.kesarmallinnovations.mergeevolutionpro --web-dir=www
-          fi
-          # Force appId fix
-          if [ -f "capacitor.config.json" ]; then
-            node -e "let fs=require('fs'); let f='capacitor.config.json'; let j=JSON.parse(fs.readFileSync(f)); j.appId=j.appId||'com.kesarmallinnovations.mergeevolutionpro'; j.appName=j.appName||'Merge Evolution PRO'; j.webDir=j.webDir||'www'; fs.writeFileSync(f, JSON.stringify(j,null,2)); console.log(j)"
-          fi
-          cat capacitor.config.json
 
       - uses: actions/setup-java@v4
         with:
@@ -46,10 +32,20 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Fix Capacitor Config
+        run: |
+          ls -la
+          npm install
+          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
+            echo "Creating capacitor.config.json"
+            npx cap init "Merge Evolution PRO" com.kesarmallinnovations.mergeevolutionpro --web-dir=www --npm-client npm
+          fi
+          node -e "const fs=require('fs'); let f='capacitor.config.json'; if(fs.existsSync(f)){let j=JSON.parse(fs.readFileSync(f)); j.appId=j.appId||'com.kesarmallinnovations.mergeevolutionpro'; j.appName=j.appName||'Merge Evolution PRO'; j.webDir=j.webDir||'www'; fs.writeFileSync(f, JSON.stringify(j,null,2)); console.log('Fixed:', j)}"
+          cat capacitor.config.json
+
       - name: Build Signed AAB
         run: |
           rm -rf android
-          npm install
           npx cap add android
           npx cap copy android
           mkdir -p android/app
