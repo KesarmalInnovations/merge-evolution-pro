@@ -14,11 +14,20 @@ jobs:
       - name: Self-Heal Missing Files
         run: |
           if [ ! -f "package.json" ]; then
-            echo "Restoring..."
-            curl -L -o package.json https://raw.githubusercontent.com/KesarmallInnovations/merge-evolution-pro/3a024e8/package.json
-            curl -L -o capacitor.config.json https://raw.githubusercontent.com/KesarmallInnovations/merge-evolution-pro/3a024e8/capacitor.config.json || true
+            echo "Finding package.json in history..."
+            for C in 3a024e8 bdbbf60 62fa0f7 9207f75; do
+              if git cat-file -e $C:package.json 2>/dev/null; then
+                echo "Restoring from $C"
+                git show $C:package.json > package.json
+                git show $C:capacitor.config.json > capacitor.config.json 2>/dev/null || true
+                git show $C:capacitor.config.ts > capacitor.config.ts 2>/dev/null || true
+                git show $C:package-lock.json > package-lock.json 2>/dev/null || true
+                break
+              fi
+            done
           fi
           ls -la
+          cat package.json | head -20
 
       - uses: actions/setup-java@v4
         with:
