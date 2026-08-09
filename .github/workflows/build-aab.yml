@@ -17,24 +17,22 @@ jobs:
             for C in $(git log --all --pretty=format:%H -- package.json); do
               if git cat-file -e $C:package.json 2>/dev/null; then
                 git show $C:package.json > package.json
-                git show $C:capacitor.config.json > capacitor.config.json 2>/dev/null || true
                 git checkout $C -- src www 2>/dev/null || true
                 break
               fi
             done
           fi
-          ls -la
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '21'
+          java-version: '17'
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Build Signed AAB
+      - name: Build Signed AAB API 36
         run: |
           npm install
-          npm install -D typescript
+          npm install -D typescript @capacitor/cli
           rm -f capacitor.config.ts
           if [ ! -f capacitor.config.json ]; then
             npx cap init "Merge Evolution PRO" com.kesarmalinnovations.mergeevolutionpro --web-dir=www --npm-client npm
@@ -43,6 +41,16 @@ jobs:
           rm -rf android
           npx cap add android
           npx cap copy android
+          
+          # --- API 36 FIX ---
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" || true
+          sed -i "s/gradle-.*-all.zip/gradle-8.9-all.zip/" android/gradle/wrapper/gradle-wrapper.properties
+          sed -i "s/compileSdkVersion.*/compileSdkVersion = 36/" android/variables.gradle || true
+          sed -i "s/targetSdkVersion.*/targetSdkVersion = 36/" android/variables.gradle || true
+          sed -i "s/compileSdk .*/compileSdk 36/" android/app/build.gradle || true
+          sed -i "s/targetSdk .*/targetSdk 36/" android/app/build.gradle || true
+          sed -i "s/minSdk .*/minSdk 24/" android/app/build.gradle || true
+          
           mkdir -p android/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
@@ -52,8 +60,8 @@ jobs:
           cp android/key.properties android/app/key.properties
           chmod +x android/gradlew
           cd android
-          ./gradlew clean bundleRelease
+          ./gradlew clean bundleRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: app-release-SIGNED-FINAL
+          name: app-release-API36-SIGNED-FINAL
           path: android/app/build/outputs/bundle/release/app-release.aab
