@@ -1,7 +1,7 @@
-name: FIX - Restore Missing Files
+name: Restore Project Files
 on: workflow_dispatch
 jobs:
-  fix:
+  restore:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -9,19 +9,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - run: |
-          git config user.name "Mobile Fix"
+      - name: Restore
+        run: |
+          git config user.name "Kesarmall"
           git config user.email "fix@mobile.com"
-          for C in $(git rev-list --all --topo-order); do
+          for C in 3a024e8 bdbbf60 62fa0f7 9207f75; do
+            echo "Trying $C"
             if git ls-tree -r --name-only $C | grep -qx "package.json"; then
-              echo "FOUND $C"
-              git checkout $C -- package.json package-lock.json 2>/dev/null || git show $C:package.json > package.json
-              git checkout $C -- capacitor.config.json capacitor.config.ts ionic.config.json 2>/dev/null || true
-              git checkout $C -- src www public 2>/dev/null || true
+              git show $C:package.json > package.json
+              git show $C:package-lock.json > package-lock.json 2>/dev/null || true
+              git show $C:capacitor.config.json > capacitor.config.json 2>/dev/null || true
+              git show $C:ionic.config.json > ionic.config.json 2>/dev/null || true
+              rm -rf src www
+              git checkout $C -- src www 2>/dev/null || true
               break
             fi
           done
           ls -la
           git add -A
-          git commit -m "Restore files from history - mobile fix" || echo "no commit"
+          git commit -m "Restore from 3a024e8" || echo "nothing"
           git push
