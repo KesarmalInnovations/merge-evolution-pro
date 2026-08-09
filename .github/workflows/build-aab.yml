@@ -1,8 +1,8 @@
 name: Merge Evolution PRO - V8 Closed Testing API 36
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
-  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,33 +10,20 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Self-Heal Missing Files
         run: |
-          set -x
           git fetch --all --prune
-          echo "Searching history for package.json..."
-          git log --all --oneline -- package.json | head -20
           if [ ! -f package.json ]; then
             for C in $(git log --all --pretty=format:%H -- package.json); do
-              echo "Checking $C"
               if git cat-file -e $C:package.json 2>/dev/null; then
-                echo "FOUND IN $C - RESTORING"
                 git show $C:package.json > package.json
                 git show $C:capacitor.config.json > capacitor.config.json 2>/dev/null || true
-                git show $C:capacitor.config.ts > capacitor.config.ts 2>/dev/null || true
-                git show $C:package-lock.json > package-lock.json 2>/dev/null || true
-                git show $C:ionic.config.json > ionic.config.json 2>/dev/null || true
                 git checkout $C -- src www 2>/dev/null || true
                 break
               fi
             done
           fi
-          echo "=== After restore ==="
           ls -la
-          cat package.json | head -30
-          test -f package.json
-
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -47,10 +34,12 @@ jobs:
       - name: Build Signed AAB
         run: |
           npm install
-          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
+          npm install -D typescript
+          rm -f capacitor.config.ts
+          if [ ! -f capacitor.config.json ]; then
             npx cap init "Merge Evolution PRO" com.kesarmalinnovations.mergeevolutionpro --web-dir=www --npm-client npm
           fi
-          node -e "let fs=require('fs');let f='capacitor.config.json';if(fs.existsSync(f)){let j=JSON.parse(fs.readFileSync(f));j.appId='com.kesarmalinnovations.mergeevolutionpro';j.appName='Merge Evolution PRO';j.webDir='www';fs.writeFileSync(f,JSON.stringify(j,null,2))}"
+          node -e "let fs=require('fs');let j=JSON.parse(fs.readFileSync('capacitor.config.json'));j.appId='com.kesarmalinnovations.mergeevolutionpro';j.appName='Merge Evolution PRO';j.webDir='www';fs.writeFileSync('capacitor.config.json',JSON.stringify(j,null,2))"
           rm -rf android
           npx cap add android
           npx cap copy android
@@ -63,7 +52,7 @@ jobs:
           cp android/key.properties android/app/key.properties
           chmod +x android/gradlew
           cd android
-          ./gradlew clean bundleRelease --no-daemon
+          ./gradlew clean bundleRelease
       - uses: actions/upload-artifact@v4
         with:
           name: app-release-SIGNED-FINAL
