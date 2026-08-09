@@ -52,45 +52,54 @@ jobs:
           sed -i "s/targetSdkVersion.*/targetSdkVersion = 36/" android/variables.gradle || true
           echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
           
-          # --- SIGNING FIX ---
           mkdir -p android/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=app/upload-keystore.jks" >> android/key.properties
+          cat > android/key.properties <<PROP
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=app/upload-keystore.jks
+          PROP
+          cat android/key.properties
           
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/app/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/key.properties
-          echo "storeFile=upload-keystore.jks" >> android/app/key.properties
-          
-          # Patch build.gradle to actually use key.properties
           node <<'NODE'
           const fs=require('fs');
           let p='android/app/build.gradle';
           let c=fs.readFileSync(p,'utf8');
-          if(!c.includes('keystoreProperties')){
-            c=`def keystoreProperties = new Properties()
+          c=c.replace(/def keystoreProperties[\s\S]*?\.load[\s\S]*?\n\}\n/g,'');
+          c=c.replace(/signingConfigs\s*\{[\s\S]*?\n\s{4}\}\n/g,'');
+          const loader=`def keystoreProperties = new Properties()
           def keystorePropertiesFile = rootProject.file('key.properties')
           if (keystorePropertiesFile.exists()) {
               keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
           }
-          `+c;
-          }
-          c=c.replace(/signingConfigs\s*\{[\s\S]*?\n\s*\}\s*\n\s*buildTypes/s, `signingConfigs {
+
+          `;
+          c=loader+c;
+          c=c.replace(/android\s*\{\n/, `android {
+              signingConfigs {
                   release {
-                      keyAlias keystoreProperties['keyAlias']
-                      keyPassword keystoreProperties['keyPassword']
-                      storeFile file(keystoreProperties['storeFile'])
-                      storePassword keystoreProperties['storePassword']
+                      if (keystorePropertiesFile.exists()) {
+                          keyAlias keystoreProperties['keyAlias']
+                          keyPassword keystoreProperties['keyPassword']
+                          storeFile file(keystoreProperties['storeFile'])
+                          storePassword keystoreProperties['storePassword']
+                      }
                   }
               }
-              buildTypes`);
-          if(!c.includes('signingConfig signingConfigs.release')){
-            c=c.replace(/buildTypes\s*\{\s*release\s*\{/, 'buildTypes {\n        release {\n            signingConfig signingConfigs.release');
-          }
+          `);
+          c=c.replace(/buildTypes\s*\{\s*release\s*\{[\s\S]*?minifyEnabled[\s\S]*?\n\s*\}\s*\n/, `buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                      shrinkResources false
+                  }
+                  debug {
+                      signingConfig signingConfigs.debug
+                  }
+          `);
           fs.writeFileSync(p,c);
+          console.log('PATCHED OK');
           NODE
           
           chmod +x android/gradlew
