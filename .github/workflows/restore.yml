@@ -1,0 +1,17 @@
+name: Restore Project Files
+on: workflow_dispatch
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          git config user.name "Kesarmall"
+          git config user.email "kesar@restore.com"
+          git checkout 3a024e8 -- package.json package-lock.json capacitor.config.json ionic.config.json src public www 2>/dev/null || git checkout 3a024e8 -- package.json
+          ls -la
+          git add package.json package-lock.json 2>/dev/null; git add -A
+          git commit -m "Restore project files" || echo "already restored"
+          git push
