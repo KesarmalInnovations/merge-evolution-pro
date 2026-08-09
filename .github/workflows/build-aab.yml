@@ -14,28 +14,28 @@ jobs:
 
       - name: Auto Restore if package.json missing
         run: |
-          set -x
           ls -la
-          if [ -f "package.json" ]; then
-            echo "package.json mil gaya"
-          else
-            echo "package.json missing hai, history se dhoondh raha hu..."
-            git log --oneline --all -30
-            GOOD=""
-            for C in $(git rev-list --all | head -100); do
-              if git ls-tree -r --name-only $C | grep -qx "package.json"; then
-                GOOD=$C
-                echo "Good commit mila: $GOOD"
-                break
-              fi
-            done
+          if [ ! -f "package.json" ]; then
+            GOOD=$(git log --all --pretty=format:%H -- package.json | head -1)
             echo "Restoring from $GOOD"
-            cp .github/workflows/build-aab.yml /tmp/build-aab.yml
+            cp .github/workflows/build-aab.yml /tmp/b.yml
             git checkout $GOOD -- .
-            cp /tmp/build-aab.yml .github/workflows/build-aab.yml
-            ls -la
-            cat package.json | head -20
+            cp /tmp/b.yml .github/workflows/build-aab.yml
           fi
+          ls -la
+
+      - name: Fix Capacitor Config
+        run: |
+          cat capacitor.config.json 2>/dev/null || echo "config.json missing"
+          cat capacitor.config.ts 2>/dev/null || echo "config.ts missing"
+          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
+            npx cap init "Merge Evolution PRO" com.kesarmallinnovations.mergeevolutionpro --web-dir=www
+          fi
+          # Force appId fix
+          if [ -f "capacitor.config.json" ]; then
+            node -e "let fs=require('fs'); let f='capacitor.config.json'; let j=JSON.parse(fs.readFileSync(f)); j.appId=j.appId||'com.kesarmallinnovations.mergeevolutionpro'; j.appName=j.appName||'Merge Evolution PRO'; j.webDir=j.webDir||'www'; fs.writeFileSync(f, JSON.stringify(j,null,2)); console.log(j)"
+          fi
+          cat capacitor.config.json
 
       - uses: actions/setup-java@v4
         with:
