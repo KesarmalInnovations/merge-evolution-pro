@@ -16,15 +16,12 @@ jobs:
           if [ ! -f package.json ]; then
             for C in $(git log --all --pretty=format:%H -- package.json); do
               if git cat-file -e $C:package.json 2>/dev/null; then
-                echo "Restoring from $C"
                 git show $C:package.json > package.json
-                git show $C:package-lock.json > package-lock.json 2>/dev/null || true
                 git checkout $C -- src www 2>/dev/null || true
                 break
               fi
             done
           fi
-          ls -la
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -36,18 +33,28 @@ jobs:
         run: |
           npm install
           npm install -D typescript @capacitor/cli
-          rm -f capacitor.config.ts
-          if [ ! -f capacitor.config.json ]; then
-            npx cap init "Merge Evolution PRO" com.kesarmalinnovations.mergeevolutionpro --web-dir=www
-          fi
-          node -e "let fs=require('fs');let f='capacitor.config.json';let j=JSON.parse(fs.readFileSync(f));j.appId='com.kesarmalinnovations.mergeevolutionpro';j.appName='Merge Evolution PRO';j.webDir='www';fs.writeFileSync(f,JSON.stringify(j,null,2))"
+          
+          # --- FIX: Direct JSON create, no .ts ---
+          rm -f capacitor.config.ts capacitor.config.json
+          cat > capacitor.config.json <<'JSON'
+          {
+            "appId": "com.kesarmalinnovations.mergeevolutionpro",
+            "appName": "Merge Evolution PRO",
+            "webDir": "www",
+            "bundledWebRuntime": false
+          }
+          JSON
+          cat capacitor.config.json
+          
           rm -rf android
           npx cap add android
           npx cap copy android
+          
           echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" || true
           sed -i "s/gradle-.*-all.zip/gradle-8.9-all.zip/" android/gradle/wrapper/gradle-wrapper.properties || true
           sed -i "s/compileSdkVersion.*/compileSdkVersion = 36/" android/variables.gradle || true
           sed -i "s/targetSdkVersion.*/targetSdkVersion = 36/" android/variables.gradle || true
+          
           mkdir -p android/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
