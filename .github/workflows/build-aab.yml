@@ -9,71 +9,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
-      
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Fresh Build + Signed AAB
+      - name: Fresh Build
         run: |
           rm -rf android
-          
-          if [ ! -f "package.json" ]; then
-            npm init -y
-            npm install @capacitor/core @capacitor/cli @capacitor/android
-            npx cap init "Merge Evolution PRO" com.kesarmalinnovations.mergeevolutionpro --web-dir=www
-          else
-            npm install
-          fi
-          
+          npm install
           npx cap add android
-          
+          npx cap copy android
           mkdir -p android/app
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-          else
-            cp release.keystore android/app/upload-keystore.jks || true
-          fi
-          
-          # --- KEY.PROPERTIES FOR SIGNING ---
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "storeFile=upload-keystore.jks" >> android/key.properties
-          
-          cat android/key.properties
-          
-          # Kotlin Duplicate Fix
+          cp android/key.properties android/app/key.properties
           sed -i "s/.*kotlin_version.*/    ext.kotlin_version = '1.8.22'/" android/build.gradle || true
           cat >> android/app/build.gradle << 'EOF'
-
           configurations.all {
-              resolutionStrategy {
-                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
-              }
+              resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'; force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'; force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22' }
               exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
               exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
           }
           EOF
-          
           chmod +x android/gradlew
 
-      - name: Build AAB V8
+      - name: Build Signed AAB
         run: |
           cd android
-          ./gradlew clean
-          ./gradlew bundleRelease --no-daemon
+          ./gradlew clean bundleRelease --no-daemon
+          jarsigner -verify app/build/outputs/bundle/release/app-release.aab
 
-      - name: Upload AAB
+      - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-v8
-          path: |
-            **/*.aab
+          name: app-release-SIGNED-FINAL
+          path: android/app/build/outputs/bundle/release/app-release.aab
