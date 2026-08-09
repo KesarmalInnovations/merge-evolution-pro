@@ -45,7 +45,6 @@ jobs:
           rm -rf android
           npx cap add android
           npx cap copy android
-          
           echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" || true
           sed -i "s/gradle-.*-all.zip/gradle-8.9-all.zip/" android/gradle/wrapper/gradle-wrapper.properties
           sed -i "s/compileSdkVersion.*/compileSdkVersion = 36/" android/variables.gradle || true
@@ -54,13 +53,13 @@ jobs:
           
           mkdir -p android/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/upload-keystore.jks
           cat > android/key.properties <<PROP
           storePassword=${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
           keyAlias=${{ secrets.KEY_ALIAS }}
           storeFile=app/upload-keystore.jks
           PROP
-          cat android/key.properties
           
           node <<'NODE'
           const fs=require('fs');
@@ -82,7 +81,7 @@ jobs:
                       if (keystorePropertiesFile.exists()) {
                           keyAlias keystoreProperties['keyAlias']
                           keyPassword keystoreProperties['keyPassword']
-                          storeFile file(keystoreProperties['storeFile'])
+                          storeFile rootProject.file(keystoreProperties['storeFile'])
                           storePassword keystoreProperties['storePassword']
                       }
                   }
@@ -99,7 +98,6 @@ jobs:
                   }
           `);
           fs.writeFileSync(p,c);
-          console.log('PATCHED OK');
           NODE
           
           chmod +x android/gradlew
