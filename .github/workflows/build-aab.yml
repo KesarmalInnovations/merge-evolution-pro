@@ -1,114 +1,36 @@
-name: Merge Evolution PRO - V8 Closed Testing API 36
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
+name: FINAL V10 - API 36 - Version 10 - Closed Testing
+on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Self-Heal Missing Files
-        run: |
-          git fetch --all --prune
-          if [ ! -f package.json ]; then
-            for C in $(git log --all --pretty=format:%H -- package.json); do
-              if git cat-file -e $C:package.json 2>/dev/null; then
-                git show $C:package.json > package.json
-                git checkout $C -- src www 2>/dev/null || true
-                break
-              fi
-            done
-          fi
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '21'
       - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Build Signed AAB API 36
+        with: {node-version: 20}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: 21}
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" || true
+      - name: Build AAB - API 36 V10 FINAL LOCKED
         run: |
           npm install
-          npm install -D typescript @capacitor/cli
-          rm -f capacitor.config.ts
-          cat > capacitor.config.json <<'JSON'
-          {
-            "appId": "com.kesarmalinnovations.mergeevolutionpro",
-            "appName": "Merge Evolution PRO",
-            "webDir": "www",
-            "bundledWebRuntime": false
-          }
-          JSON
-          rm -rf android
           npx cap add android
-          npx cap copy android
-          
-          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" || true
-          sed -i "s/gradle-.*-all.zip/gradle-8.9-all.zip/" android/gradle/wrapper/gradle-wrapper.properties
-          sed -i "s/compileSdkVersion.*/compileSdkVersion = 36/" android/variables.gradle || true
-          sed -i "s/targetSdkVersion.*/targetSdkVersion = 36/" android/variables.gradle || true
+          npx cap sync android
           echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
-          
-          # --- VERSION CODE 8 ---
-          sed -i "s/versionCode .*/versionCode 8/" android/app/build.gradle
-          sed -i "s/versionName .*/versionName \"1.0.8\"/" android/app/build.gradle
-          
-          mkdir -p android/app
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/upload-keystore.jks
-          cat > android/key.properties <<PROP
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=app/upload-keystore.jks
-          PROP
-          
-          node <<'NODE'
-          const fs=require('fs');
-          let p='android/app/build.gradle';
-          let c=fs.readFileSync(p,'utf8');
-          c=c.replace(/def keystoreProperties[\s\S]*?\.load[\s\S]*?\n\}\n/g,'');
-          c=c.replace(/signingConfigs\s*\{[\s\S]*?\n\s{4}\}\n/g,'');
-          const loader=`def keystoreProperties = new Properties()
-          def keystorePropertiesFile = rootProject.file('key.properties')
-          if (keystorePropertiesFile.exists()) {
-              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-          }
-
-          `;
-          c=loader+c;
-          c=c.replace(/android\s*\{\n/, `android {
-              signingConfigs {
-                  release {
-                      if (keystorePropertiesFile.exists()) {
-                          keyAlias keystoreProperties['keyAlias']
-                          keyPassword keystoreProperties['keyPassword']
-                          storeFile rootProject.file(keystoreProperties['storeFile'])
-                          storePassword keystoreProperties['storePassword']
-                      }
-                  }
-              }
-          `);
-          c=c.replace(/buildTypes\s*\{\s*release\s*\{[\s\S]*?minifyEnabled[\s\S]*?\n\s*\}\s*\n/, `buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                      minifyEnabled false
-                      shrinkResources false
-                  }
-                  debug {
-                      signingConfig signingConfigs.debug
-                  }
-          `);
-          fs.writeFileSync(p,c);
-          NODE
-          
-          chmod +x android/gradlew
+          sed -i 's/compileSdkVersion = .*/compileSdkVersion = 36/' android/variables.gradle || true
+          sed -i 's/targetSdkVersion = .*/targetSdkVersion = 36/' android/variables.gradle || true
+          sed -i 's/versionCode .*/versionCode 10/' android/app/build.gradle || true
+          sed -i 's/versionName .*/versionName "1.0.10"/' android/app/build.gradle || true
           cd android
-          ./gradlew clean bundleRelease --no-daemon
-      - uses: actions/upload-artifact@v4
+          mkdir -p app/app
+          cp ../release.keystore app/release.keystore || true
+          cp ../release.keystore app/app/release.keystore || true
+          ./gradlew bundleRelease -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore -Pandroid.injected.signing.store.password=123456 -Pandroid.injected.signing.key.alias=kesarmal -Pandroid.injected.signing.key.password=123456
+      - name: Upload AAB V10
+        uses: actions/upload-artifact@v4
         with:
-          name: app-release-API36-SIGNED-V8-FINAL
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: FINAL-LOCKED-V10-API36-AAB-CLOSED-TESTING
+          path: android/app/build/outputs/bundle/release/*.aab
