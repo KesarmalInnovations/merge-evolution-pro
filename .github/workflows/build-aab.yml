@@ -19,9 +19,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Fresh Build - Fix Everything
+      - name: Fresh Build + Signed AAB
         run: |
-          # Sab kachra saaf
           rm -rf android
           
           if [ ! -f "package.json" ]; then
@@ -41,13 +40,18 @@ jobs:
             cp release.keystore android/app/upload-keystore.jks || true
           fi
           
-          # Kotlin Duplicate Fix - Sahi wala
-          sed -i "s/.*kotlin_version.*/    ext.kotlin_version = '1.8.22'/" android/build.gradle || true
+          # --- KEY.PROPERTIES FOR SIGNING ---
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=upload-keystore.jks" >> android/key.properties
           
-          # App level pe sahi fix
+          cat android/key.properties
+          
+          # Kotlin Duplicate Fix
+          sed -i "s/.*kotlin_version.*/    ext.kotlin_version = '1.8.22'/" android/build.gradle || true
           cat >> android/app/build.gradle << 'EOF'
 
-          // FIX DUPLICATE KOTLIN
           configurations.all {
               resolutionStrategy {
                   force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
@@ -60,7 +64,6 @@ jobs:
           EOF
           
           chmod +x android/gradlew
-          ls -la android/
 
       - name: Build AAB V8
         run: |
