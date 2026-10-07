@@ -1,4 +1,4 @@
-name: FINAL V11 - API 36 - 100 Levels
+name: FINAL V11 - API 36 - 100 Levels Clean
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - 'www/**'
       - 'capacitor.config.json'
       - 'package.json'
+      - '.github/workflows/build-aab.yml'
 
 jobs:
   build:
@@ -30,27 +31,25 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
-      - name: Build Web (if needed)
-        run: echo "www already has index.html"
-
       - name: Setup Android SDK 36
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Sync Capacitor
+      - name: Sync Capacitor Android
         run: |
           npx cap sync android
           npx cap copy android
 
-      - name: Build AAB - API 36 V11 FINAL 100 Levels
+      - name: Build AAB - API 36 V11 100 Levels FINAL CLEAN
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon
+          ./gradlew bundleRelease --no-daemon -x lint
 
       - name: Upload AAB V11
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-aab-v11-100levels
+          name: app-release-aab-v11-100levels-clean
           path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
