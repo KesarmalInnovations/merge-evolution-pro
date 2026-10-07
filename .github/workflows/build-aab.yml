@@ -1,4 +1,4 @@
-name: FINAL V11.5 - SIGNED - Production
+name: FINAL V11.6 - SIGNED - Version 12
 
 on:
   push:
@@ -31,10 +31,9 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Decode Keystore from Secret
+      - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
-          ls -lh android/app/release.keystore
 
       - name: Create keystore.properties
         run: |
@@ -43,11 +42,19 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
 
-      - name: Inject signing into build.gradle
+      - name: Bump versionCode + Inject signing
         run: |
           python3 << 'PY'
-          import pathlib
-          p = pathlib.Path("android/app/build.gradle").read_text()
+          import pathlib, re
+          path = pathlib.Path("android/app/build.gradle")
+          p = path.read_text()
+
+          # 1. versionCode 12 set karo (agar 12 already used bole toh 13 kar dena)
+          p = re.sub(r'versionCode\s+\d+', 'versionCode 12', p)
+          # 2. versionName bhi 1.0.12 kar do
+          p = re.sub(r'versionName\s+".*?"', 'versionName "1.0.12"', p)
+
+          # 3. signing inject
           if "signingConfigs" not in p:
               p = p.replace("android {", """
           def keystorePropertiesFile = rootProject.file("app/keystore.properties")
@@ -67,8 +74,9 @@ jobs:
               }
           """, 1)
               p = p.replace("buildTypes {\n        release {", "buildTypes {\n        release {\n            signingConfig signingConfigs.release")
-          pathlib.Path("android/app/build.gradle").write_text(p)
-          print("Patched!")
+
+          path.write_text(p)
+          print("Patched versionCode 12 + signing")
           PY
 
       - run: npx cap sync android
@@ -81,5 +89,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SIGNED-AAB-PRODUCTION-V11-5
+          name: SIGNED-AAB-V12-PRODUCTION
           path: android/app/build/outputs/bundle/release/app-release.aab
