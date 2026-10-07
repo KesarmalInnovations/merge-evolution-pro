@@ -1,4 +1,4 @@
-name: FINAL V11.9 - ADS + API36 + SIGNED
+name: FINAL V11.10 - ADS + API36 FIXED
 
 on:
   push:
@@ -18,11 +18,12 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - run: npm install
+      - name: Install deps
+        run: npm install
 
       - name: Add Android platform
         run: |
-          if [! -d "android" ]; then
+          if [ ! -d "android" ]; then
             npx cap add android
           fi
 
@@ -34,6 +35,7 @@ jobs:
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+          ls -lh android/app/release.keystore
 
       - name: Create keystore.properties
         run: |
@@ -42,12 +44,10 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
 
-      - name: Patch API36 + Version14 + ADS Permission + Signing
+      - name: Patch API36 + V14 + AD_ID + Signing
         run: |
           python3 << 'PY'
           import pathlib, re
-
-          # 1. build.gradle
           p = pathlib.Path("android/app/build.gradle").read_text()
           p = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 36', p)
           p = re.sub(r'compileSdk\s+\d+', 'compileSdk 36', p)
@@ -55,59 +55,29 @@ jobs:
           p = re.sub(r'targetSdk\s+\d+', 'targetSdk 36', p)
           p = re.sub(r'versionCode\s+\d+', 'versionCode 14', p)
           p = re.sub(r'versionName\s+".*?"', 'versionName "1.0.14"', p)
-
           if "signingConfigs" not in p:
-              p = p.replace("android {", '''
-          def keystorePropertiesFile = rootProject.file("app/keystore.properties")
-          def keystoreProperties = new Properties()
-          if (keystorePropertiesFile.exists()) {
-              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-          }
-
-          android {
-              signingConfigs {
-                  release {
-                      storeFile file(keystoreProperties['storeFile']?: 'release.keystore')
-                      storePassword keystoreProperties['storePassword']
-                      keyAlias keystoreProperties['keyAlias']
-                      keyPassword keystoreProperties['keyPassword']
-                  }
-              }
-          ''', 1)
-              p = p.replace("buildTypes {\n release {", "buildTypes {\n release {\n signingConfig signingConfigs.release")
-
+              p = p.replace("android {", 'def keystorePropertiesFile = rootProject.file("app/keystore.properties")\ndef keystoreProperties = new Properties()\nif (keystorePropertiesFile.exists()) {\n keystoreProperties.load(new FileInputStream(keystorePropertiesFile))\n}\n\nandroid {\n signingConfigs {\n release {\n storeFile file(keystoreProperties["storeFile"] ?: "release.keystore")\n storePassword keystoreProperties["storePassword"]\n keyAlias keystoreProperties["keyAlias"]\n keyPassword keystoreProperties["keyPassword"]\n }\n }', 1)
+          if "signingConfig signingConfigs.release" not in p:
+              p = p.replace("release {", "release {\n signingConfig signingConfigs.release", 1)
           pathlib.Path("android/app/build.gradle").write_text(p)
-
-          # 2. AndroidManifest.xml - AD_ID permission add
-          mpath = pathlib.Path("android/app/src/main/AndroidManifest.xml")
-          mp = mpath.read_text()
-          if "com.google.android.gms.permission.AD_ID" not in mp:
-              mp = mp.replace("<manifest", '<manifest xmlns:tools="http://schemas.android.com/tools"\n', 1) if "xmlns:tools" not in mp else mp
-              mp = mp.replace("</manifest>", ' <uses-permission android:name="com.google.android.gms.permission.AD_ID" />\n</manifest>')
-              # application tag ke just upar bhi daal de safe side
-              if '<application' in mp and 'AD_ID' not in mp.split('<application')[0]:
-                 mp = mp.replace("<application", ' <uses-permission android:name="com.google.android.gms.permission.AD_ID" />\n <application')
-          mpath.write_text(mp)
-          print("Patched AD_ID permission + API36 + v14")
-
-          # 3. variables.gradle
-          vpath = pathlib.Path("android/variables.gradle")
-          if vpath.exists():
-              vp = vpath.read_text()
-              vp = re.sub(r'compileSdkVersion\s*=\s*\d+', 'compileSdkVersion = 36', vp)
-              vp = re.sub(r'targetSdkVersion\s*=\s*\d+', 'targetSdkVersion = 36', vp)
-              vpath.write_text(vp)
+          m = pathlib.Path("android/app/src/main/AndroidManifest.xml").read_text()
+          if "AD_ID" not in m:
+              m = m.replace("<application", '<uses-permission android:name="com.google.android.gms.permission.AD_ID" />\n <application')
+              pathlib.Path("android/app/src/main/AndroidManifest.xml").write_text(m)
+          print("Patched done")
           PY
 
-      - run: npx cap sync android
+      - name: Sync Capacitor
+        run: npx cap sync android
 
-      - name: Build SIGNED AAB - ADS + API36
+      - name: Build SIGNED AAB
         working-directory: android
         run: |
           chmod +x gradlew
-         ./gradlew bundleRelease --no-daemon -x lint
+          ./gradlew bundleRelease --no-daemon -x lint
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
         with:
-          name: SIGNED-AAB-ADS-API36-V14
+          name: SIGNED-AAB-ADS-API36-V14-FIXED
           path: android/app/build/outputs/bundle/release/app-release.aab
