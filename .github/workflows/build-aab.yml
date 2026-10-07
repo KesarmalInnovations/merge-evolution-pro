@@ -1,4 +1,4 @@
-name: FINAL V11.13 - AD_ID REAL FIX
+name: FINAL V11.14 - SIGNED + AD_ID + API36 FIX
 
 on:
   push:
@@ -18,8 +18,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - run: npm install
-      - run: if [ ! -d "android" ]; then npx cap add android; fi
+      - name: Install
+        run: |
+          npm install
+          if [ ! -d "android" ]; then npx cap add android; fi
 
       - name: Setup SDK 36
         run: |
@@ -27,7 +29,9 @@ jobs:
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Decode Keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+          ls -lh android/app/release.keystore
 
       - name: Create keystore.properties
         run: |
@@ -36,42 +40,64 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
 
-      - name: Patch + Sync + AD_ID FIX
+      - name: Patch BEFORE Sync - Version + Signing + SDK36
         run: |
           python3 << 'PY'
           import pathlib, re
-          bg = pathlib.Path("android/app/build.gradle")
-          t = bg.read_text()
-          t = re.sub(r'versionCode\s+\d+', 'versionCode 16', t)
-          t = re.sub(r'versionName\s+".*?"', 'versionName "1.0.16"', t)
-          bg.write_text(t)
+          bg_path = pathlib.Path("android/app/build.gradle")
+          t = bg_path.read_text()
+          t = re.sub(r'versionCode\s+\d+', 'versionCode 17', t)
+          t = re.sub(r'versionName\s+".*?"', 'versionName "1.0.17"', t)
+          # keystore props
+          if "keystorePropertiesFile" not in t:
+              t = t.replace("android {", 'def keystorePropertiesFile = rootProject.file("app/keystore.properties")\ndef keystoreProperties = new Properties()\nif (keystorePropertiesFile.exists()) {\n    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))\n}\n\nandroid {', 1)
+          # signingConfigs
+          if "signingConfigs" not in t:
+              t = t.replace("android {", 'android {\n    signingConfigs {\n        release {\n            storeFile file(keystoreProperties[\'storeFile\'] ?: \'release.keystore\')\n            storePassword keystoreProperties[\'storePassword\']\n            keyAlias keystoreProperties[\'keyAlias\']\n            keyPassword keystoreProperties[\'keyPassword\']\n        }\n    }', 1)
+          # signingConfig inside buildTypes release
+          if "signingConfig signingConfigs.release" not in t:
+              t = re.sub(r'buildTypes\s*{\s*release\s*{', 'buildTypes {\n        release {\n            signingConfig signingConfigs.release', t, count=1)
+          bg_path.write_text(t)
+          # variables.gradle
           v = pathlib.Path("android/variables.gradle")
           if v.exists():
               vt = v.read_text()
               vt = re.sub(r'compileSdkVersion\s*=\s*\d+', 'compileSdkVersion = 36', vt)
               vt = re.sub(r'targetSdkVersion\s*=\s*\d+', 'targetSdkVersion = 36', vt)
               v.write_text(vt)
+          print("BEFORE SYNC PATCH DONE")
           PY
+
+      - name: Sync + Patch AFTER Sync - AD_ID
+        run: |
           npx cap sync android
           python3 << 'PY'
-          import pathlib
-          mpath = pathlib.Path("android/app/src/main/AndroidManifest.xml")
-          txt = mpath.read_text()
-          if "AD_ID" not in txt:
-              txt = txt.replace("</manifest>", '    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />\n</manifest>')
-              mpath.write_text(txt)
-          print("MANIFEST AFTER FIX:")
-          print(mpath.read_text()[-500:])
+          import pathlib, re
+          # Re-ensure signing after sync (cap sync kabhi kabhi hata deta hai)
+          bg_path = pathlib.Path("android/app/build.gradle")
+          t = bg_path.read_text()
+          if "signingConfig signingConfigs.release" not in t:
+              t = re.sub(r'buildTypes\s*{\s*release\s*{', 'buildTypes {\n        release {\n            signingConfig signingConfigs.release', t, count=1)
+              bg_path.write_text(t)
+          # AD_ID permission - AFTER sync (yehi main fix hai)
+          m = pathlib.Path("android/app/src/main/AndroidManifest.xml")
+          mt = m.read_text()
+          if "AD_ID" not in mt:
+              mt = mt.replace("</manifest>", '    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />\n</manifest>')
+              m.write_text(mt)
+          print("AFTER SYNC:")
+          print("Signing present:", "signingConfig signingConfigs.release" in pathlib.Path("android/app/build.gradle").read_text())
+          print("AD_ID present:", "AD_ID" in pathlib.Path("android/app/src/main/AndroidManifest.xml").read_text())
           PY
-          cat android/app/src/main/AndroidManifest.xml | grep -i AD_ID || echo "AD_ID NOT FOUND - FAILED"
 
-      - name: Build AAB
+      - name: Build SIGNED AAB
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew bundleRelease --no-daemon -x lint
+          ls -lh app/build/outputs/bundle/release/
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SIGNED-AAB-V16-ADID-FIXED
+          name: SIGNED-AAB-V17-FINAL-FIXED
           path: android/app/build/outputs/bundle/release/app-release.aab
