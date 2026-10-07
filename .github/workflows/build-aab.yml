@@ -1,4 +1,4 @@
-name: FINAL V11.3 - 100 Levels - FIXED
+name: FINAL V11.5 - SIGNED - Production
 
 on:
   push:
@@ -17,19 +17,69 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
       - run: npm install
-      - name: Add Android
+
+      - name: Add Android platform
         run: |
           if [ ! -d "android" ]; then
             npx cap add android
           fi
-      - name: SDK 36
+
+      - name: Setup SDK 36
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Decode Keystore from Secret
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+          ls -lh android/app/release.keystore
+
+      - name: Create keystore.properties
+        run: |
+          echo "storeFile=release.keystore" > android/app/keystore.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/app/keystore.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
+
+      - name: Inject signing into build.gradle
+        run: |
+          python3 << 'PY'
+          import pathlib
+          p = pathlib.Path("android/app/build.gradle").read_text()
+          if "signingConfigs" not in p:
+              p = p.replace("android {", """
+          def keystorePropertiesFile = rootProject.file("app/keystore.properties")
+          def keystoreProperties = new Properties()
+          if (keystorePropertiesFile.exists()) {
+              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+          }
+
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file(keystoreProperties['storeFile'] ?: 'release.keystore')
+                      storePassword keystoreProperties['storePassword']
+                      keyAlias keystoreProperties['keyAlias']
+                      keyPassword keystoreProperties['keyPassword']
+                  }
+              }
+          """, 1)
+              p = p.replace("buildTypes {\n        release {", "buildTypes {\n        release {\n            signingConfig signingConfigs.release")
+          pathlib.Path("android/app/build.gradle").write_text(p)
+          print("Patched!")
+          PY
+
       - run: npx cap sync android
-      - run: cd android && chmod +x gradlew && ./gradlew bundleRelease --no-daemon -x lint
+
+      - name: Build SIGNED AAB
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon -x lint
+
       - uses: actions/upload-artifact@v4
         with:
-          name: app-aab-v11-3
+          name: SIGNED-AAB-PRODUCTION-V11-5
           path: android/app/build/outputs/bundle/release/app-release.aab
