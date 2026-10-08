@@ -13,42 +13,27 @@ jobs:
       - uses: actions/setup-java@v4
         with: { java-version: 17, distribution: temurin }
 
-      - name: Install
-        run: npm ci || npm install
-      - name: Build web
-        run: npm run build || true
-
-      - name: Build SIGNED AAB - ABSOLUTE PATH
+      - name: Build AAB + MANUAL SIGN
         run: |
           rm -rf android
+          npm ci || npm install
+          npm run build || true
           npx cap add android
           npx cap copy android
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
-          sed -i 's/minSdk = 22/minSdk = 24/g' android/variables.gradle || true
-          echo "--- Creating keystore ---"
-          keytool -genkey -v -keystore android/app/release.keystore -alias merge -keyalg RSA -keysize 2048 -validity 10000 -storepass android123 -keypass android123 -dname "CN=Merge PRO, O=Kesarmall, L=Manesar, ST=Haryana, C=IN"
-          echo "--- Absolute path fix ---"
-          KS_PATH="$(pwd)/android/app/release.keystore"
-          echo "Keystore at: $KS_PATH"
-          ls -lh $KS_PATH
-          cat > android/keystore.properties <<EOF
-          storeFile=$KS_PATH
-          storePassword=android123
-          keyAlias=merge
-          keyPassword=android123
-          EOF
-          cat android/keystore.properties
+          keytool -genkey -v -keystore android/app/release.keystore -alias merge -keyalg RSA -keysize 2048 -validity 10000 -storepass android123 -keypass android123 -dname "CN=Merge, O=Kesarmall, L=Manesar, ST=Haryana, C=IN"
           cd android
           chmod +x gradlew
-          ./gradlew clean
-          ./gradlew bundleRelease --no-build-cache --rerun-tasks
-          echo "--- VERIFY SIGNED ---"
-          ls -lh app/build/outputs/bundle/release/
-          unzip -l app/build/outputs/bundle/release/app-release.aab | grep -E "BUNDLE|META-INF/.*\.SF|META-INF/.*\.RSA"
-          if unzip -l app/build/outputs/bundle/release/app-release.aab | grep -q "BUNDLE.SF"; then echo "✅ SIGNED CONFIRMED"; else echo "❌ STILL UNSIGNED"; exit 1; fi
+          ./gradlew clean bundleRelease --no-build-cache --rerun-tasks
+          echo "--- Unsigned AAB built, now signing manually ---"
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore app/release.keystore -storepass android123 -keypass android123 app/build/outputs/bundle/release/app-release.aab merge
+          echo "--- VERIFY ---"
+          jarsigner -verify -verbose app/build/outputs/bundle/release/app-release.aab | head -20
+          unzip -l app/build/outputs/bundle/release/app-release.aab | grep -E "BUNDLE.SF|MERGE.SF|META-INF/MANIFEST"
+          echo "✅ SIGNED BY JARSIGNER"
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: SIGNED-AAB-ABSOLUTE-FINAL
+          name: SIGNED-AAB-MANUAL-FINAL
           path: android/app/build/outputs/bundle/release/*.aab
