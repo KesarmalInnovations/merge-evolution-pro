@@ -1,4 +1,4 @@
-name: FINAL V23 - AD_ID FIX WITH SEPARATE FILE
+name: Build Signed AAB
 
 on:
   push:
@@ -8,69 +8,73 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '21' }
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Install
-        run: |
-          npm install
-          if [ ! -d "android" ]; then npx cap add android; fi
-
-      - name: SDK 36
-        run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-
-      - name: Decode Keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
-
-      - name: Keystore props
-        run: |
-          echo "storeFile=release.keystore" > android/app/keystore.properties
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/app/keystore.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
-
-      - name: Patch Gradle V23
-        run: |
-          python3 << 'PY'
-          import pathlib, re
-          bg = pathlib.Path("android/app/build.gradle")
-          t = bg.read_text()
-          t = re.sub(r'versionCode\s+\d+', 'versionCode 23', t)
-          t = re.sub(r'versionName\s+".*?"', 'versionName "1.0.23"', t)
-          if "keystorePropertiesFile" not in t:
-              t = t.replace("android {", 'def keystorePropertiesFile = rootProject.file("app/keystore.properties")\ndef keystoreProperties = new Properties()\nif (keystorePropertiesFile.exists()) {\n    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))\n}\n\nandroid {', 1)
-          if "signingConfigs" not in t:
-              t = t.replace("android {", 'android {\n    signingConfigs {\n        release {\n            storeFile file(keystoreProperties[\'storeFile\'])\n            storePassword keystoreProperties[\'storePassword\']\n            keyAlias keystoreProperties[\'keyAlias\']\n            keyPassword keystoreProperties[\'keyPassword\']\n        }\n    }', 1)
-          if "signingConfig signingConfigs.release" not in t:
-              t = re.sub(r'buildTypes\s*{\s*release\s*{', 'buildTypes {\n        release {\n            signingConfig signingConfigs.release', t, count=1)
-          bg.write_text(t)
-          vg = pathlib.Path("android/variables.gradle")
-          vt = re.sub(r'compileSdkVersion\s*=\s*\d+', 'compileSdkVersion = 36', vg.read_text())
-          vt = re.sub(r'targetSdkVersion\s*=\s*\d+', 'targetSdkVersion = 36', vt)
-          vg.write_text(vt)
-          PY
-
-      - name: Sync
-        run: npx cap sync android
-
-      - name: Fix AD_ID from separate file
-        run: |
-          chmod +x fix-ad-id.sh
-          ./fix-ad-id.sh
-
-      - name: Build AAB
-        working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon -x lint
-
-      - uses: actions/upload-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: SIGNED-AAB-V23-ADS-FIXED
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          node-version: 20
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build web
+        run: npm run build || echo "No build script, using www folder"
+
+      - name: Add Android platform
+        run: npx cap add android || true
+
+      - name: Copy web to Android
+        run: npx cap copy android
+
+      - name: Fix AD_ID permission for Ads
+        run: |
+          echo "Adding AD_ID permission..."
+          chmod +x ./fix-ad-id.sh || true
+          ./fix-ad-id.sh || true
+          # Fallback if fix-ad-id.sh fails
+          if ! grep -q "AD_ID" android/app/src/main/AndroidManifest.xml; then
+            sed -i '/<manifest/a \    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml
+          fi
+          cat android/app/src/main/AndroidManifest.xml | grep AD_ID || true
+
+      - name: Fix minSdkVersion to 24 for Play Protect
+        run: |
+          echo "Fixing minSdkVersion 22 -> 24..."
+          # Fix in variables.gradle
+          sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
+          sed -i 's/22/24/g' android/variables.gradle || true
+          # Fix in build.gradle
+          sed -i 's/minSdkVersion 22/minSdkVersion 24/g' android/app/build.gradle || true
+          echo "Checking fixed values:"
+          grep -r "minSdk" android/ || true
+          cat android/variables.gradle
+
+      - name: Setup Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          echo "storeFile=release.keystore" > android/keystore.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/keystore.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/keystore.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/keystore.properties
+
+      - name: Build Signed AAB
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+
+      - name: Upload Signed AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: SIGNED-AAB-V27-FINAL-MINSDK24-ADS-FIXED
+          path: android/app/build/outputs/bundle/release/*.aab
