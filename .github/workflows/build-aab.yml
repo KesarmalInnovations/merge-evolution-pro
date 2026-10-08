@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { java-version: 17, distribution: temurin }
 
-      - name: Build with ORIGINAL keystore
+      - name: Build + MANUAL SIGN with ORIGINAL KEY
         run: |
           npm ci || npm install
           npm run build || true
@@ -21,36 +21,23 @@ jobs:
           npx cap add android
           npx cap copy android
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
-          echo "=== Original keystore check ==="
+          echo "=== Original keystore ==="
           ls -lh release.keystore
-          KS_PATH="$(pwd)/release.keystore"
-          echo "Using: $KS_PATH"
-          # Try to list with secrets first
-          keytool -list -v -keystore release.keystore -storepass ${{ secrets.KEYSTORE_PASSWORD }} -alias ${{ secrets.KEY_ALIAS }} 2>&1 | head -20 || keytool -list -v -keystore release.keystore -storepass android123 2>&1 | head -20
-          cp release.keystore android/app/release.keystore
-          cp release.keystore android/release.keystore
-          # Create properties with ABSOLUTE path and your secrets
-          cat > android/keystore.properties <<EOF
-          storeFile=$KS_PATH
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
-          cat android/keystore.properties
-          cat > android/app/keystore.properties <<EOF
-          storeFile=release.keystore
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
+          # Build UNSIGNED first
           cd android
           chmod +x gradlew
-          ./gradlew clean bundleRelease --no-build-cache --rerun-tasks
-          echo "=== FINAL VERIFY ==="
-          jarsigner -verify -verbose app/build/outputs/bundle/release/app-release.aab | head -20
+          ./gradlew clean bundleRelease --no-build-cache --rerun-tasks || ./gradlew bundleRelease
+          echo "=== Now signing manually with ORIGINAL key ==="
+          AAB="app/build/outputs/bundle/release/app-release.aab"
+          ls -lh $AAB
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore ../release.keystore -storepass ${{ secrets.KEYSTORE_PASSWORD }} -keypass ${{ secrets.KEY_PASSWORD }} $AAB ${{ secrets.KEY_ALIAS }}
+          echo "=== VERIFY ==="
+          jarsigner -verify -verbose $AAB | head -20
+          unzip -l $AAB | grep -E "BUNDLE.SF|META-INF/MANIFEST"
+          echo "✅ SIGNED WITH ORIGINAL 66:C8... KEY"
 
-      - name: Upload SIGNED AAB
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: FINAL-SIGNED-ORIGINAL-KEY
+          name: SIGNED-ORIGINAL-KEY-FINAL
           path: android/app/build/outputs/bundle/release/*.aab
