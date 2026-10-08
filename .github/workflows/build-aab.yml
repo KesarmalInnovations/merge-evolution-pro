@@ -27,32 +27,22 @@ jobs:
 
       - name: Add Android Platform
         run: |
-          # Clean and add fresh
           rm -rf android || true
-          npx cap add android || true
-          ls -la android/ || true
+          npx cap add android
+          ls -la android/
 
       - name: Copy web to Android
-        run: npx cap copy android || npx cap sync android || true
+        run: npx cap copy android
 
-      - name: FORCE minSdk 24 and AD_ID
+      - name: FORCE minSdk 24 and AD_ID - FINAL FIX
         run: |
-          echo "=== Fixing minSdk 24 ==="
-          cat > android/variables.gradle << 'EOF'
-          ext {
-              minSdkVersion = 24
-              compileSdkVersion = 34
-              targetSdkVersion = 34
-              androidxAppCompatVersion = '1.6.1'
-              androidxJunitVersion = '1.1.5'
-              androidxEspressoCoreVersion = '3.5.1'
-              junitVersion = '4.13.2'
-              androidxMaterialVersion = '1.11.0'
-              androidxBrowserVersion = '1.8.0'
-              androidxExifInterfaceVersion = '1.3.6'
-              coreSplashScreenVersion = '1.0.1'
-          }
-          EOF
+          echo "=== BEFORE ==="
+          cat android/variables.gradle
+          # ONLY change minSdk, don't overwrite whole file
+          sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
+          sed -i 's/minSdkVersion = 23/minSdkVersion = 24/g' android/variables.gradle || true
+          sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle || true
+          echo "=== AFTER ==="
           cat android/variables.gradle
           chmod +x ./fix-ad-id.sh || true
           ./fix-ad-id.sh || true
@@ -68,17 +58,8 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/keystore.properties
 
-      - name: Build AAB - FIXED FOR GRADLEW
+      - name: Build AAB
         run: |
-          echo "Checking for gradlew..."
-          ls -la android/ | grep gradlew || true
-          # If gradlew missing, restore
-          if [ ! -f "android/gradlew" ]; then
-            echo "gradlew missing, reinstalling android platform..."
-            rm -rf android
-            npx cap add android
-            npx cap copy android
-          fi
           chmod +x android/gradlew
           cd android
           ./gradlew bundleRelease
