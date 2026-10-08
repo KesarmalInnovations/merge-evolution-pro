@@ -15,7 +15,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - name: Build AAB
+      - name: Build AAB Fixed
         env:
           STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASS: ${{ secrets.KEY_PASSWORD }}
@@ -27,20 +27,18 @@ jobs:
           npx cap add android
           npx cap copy android
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
-          NEW_CODE=$(date +%s)
-          echo "Version $NEW_CODE"
+          sed -i 's/targetSdkVersion = 34/targetSdkVersion = 36/g' android/variables.gradle || true
+          sed -i 's/compileSdkVersion = 34/compileSdkVersion = 36/g' android/variables.gradle || true
+          sed -i 's/<application/<uses-permission android:name="com.google.android.gms.permission.AD_ID" \/> <application/' android/app/src/main/AndroidManifest.xml || true
+          NEW_CODE=6
           sed -i "s/versionCode [0-9]*/versionCode $NEW_CODE/" android/app/build.gradle
-          sed -i 's/versionName ".*"/versionName "1.0.'$NEW_CODE'"/' android/app/build.gradle
           ls -lh release.keystore
-          cd android
-          chmod +x gradlew
-          ./gradlew clean bundleRelease
-          cd ..
-          ls -lh android/app/build/outputs/bundle/release/app-release.aab
+          chmod +x android/gradlew
+          android/gradlew -p android clean bundleRelease
           jarsigner -sigalg SHA256withRSA -digestalg SHA-256 -keystore release.keystore -storepass $STORE_PASS -keypass $KEY_PASS android/app/build/outputs/bundle/release/app-release.aab $KEY_ALIAS
           jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: FINAL-AAB
+          name: FINAL-AAB-FIXED
           path: android/app/build/outputs/bundle/release/*.aab
