@@ -1,4 +1,21 @@
-      - name: Build + MANUAL SIGN with ORIGINAL KEY
+name: Build Signed AAB
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Build AAB with ORIGINAL key
         run: |
           npm ci || npm install
           npm run build || true
@@ -6,18 +23,22 @@
           npx cap add android
           npx cap copy android
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
-          
-          # --- AUTO BUMP VERSION CODE ---
           NEW_CODE=$(date +%s)
-          echo "Bumping versionCode to $NEW_CODE"
-          sed -i "s/versionCode [0-9]*/versionCode $NEW_CODE/g" android/app/build.gradle
-          sed -i "s/versionName \".*\"/versionName \"1.0.$NEW_CODE\"/g" android/app/build.gradle
-          cat android/app/build.gradle | grep -E "versionCode|versionName"
-          
+          echo "Bumping to $NEW_CODE"
+          sed -i "s/versionCode [0-9]*/versionCode $NEW_CODE/" android/app/build.gradle
+          sed -i "s/versionName \".*\"/versionName \"1.0.$NEW_CODE\"/" android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
           ls -lh release.keystore
           cd android
           chmod +x gradlew
-          ./gradlew clean bundleRelease --no-build-cache --rerun-tasks || ./gradlew bundleRelease
-          AAB="app/build/outputs/bundle/release/app-release.aab"
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore ../release.keystore -storepass ${{ secrets.KEYSTORE_PASSWORD }} -keypass ${{ secrets.KEY_PASSWORD }} $AAB ${{ secrets.KEY_ALIAS }}
+         ./gradlew clean bundleRelease
+          cd..
+          AAB="android/app/build/outputs/bundle/release/app-release.aab"
+          ls -lh $AAB
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore release.keystore -storepass ${{ secrets.KEYSTORE_PASSWORD }} -keypass ${{ secrets.KEY_PASSWORD }} $AAB ${{ secrets.KEY_ALIAS }}
           jarsigner -verify $AAB
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: FINAL-AAB-SIGNED
+          path: android/app/build/outputs/bundle/release/*.aab
