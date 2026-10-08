@@ -29,8 +29,16 @@ jobs:
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
           sed -i 's/targetSdkVersion = 34/targetSdkVersion = 36/g' android/variables.gradle || true
           sed -i 's/compileSdkVersion = 34/compileSdkVersion = 36/g' android/variables.gradle || true
-          sed -i 's/<application/<uses-permission android:name="com.google.android.gms.permission.AD_ID" \/> <application/' android/app/src/main/AndroidManifest.xml || true
-          NEW_CODE=9
+          cat > /tmp/fix.py << 'PY'
+          import pathlib
+          p=pathlib.Path('android/app/src/main/AndroidManifest.xml')
+          t=p.read_text()
+          if 'AD_ID' not in t:
+              t=t.replace('<application', '<uses-permission android:name="com.google.android.gms.permission.AD_ID" />\n <application')
+              p.write_text(t)
+          PY
+          python3 /tmp/fix.py
+          NEW_CODE=10
           sed -i "s/versionCode [0-9]*/versionCode $NEW_CODE/" android/app/build.gradle
           ls -lh release.keystore
           chmod +x android/gradlew
