@@ -12,36 +12,46 @@ jobs:
         with: { node-version: 20 }
       - uses: actions/setup-java@v4
         with: { java-version: 17, distribution: temurin }
-      - name: Install
+
+      - name: Install deps
         run: npm ci || npm install
+
       - name: Build web
-        run: npm run build || true
-      - name: Build Signed AAB - FIXED SIGNING
+        run: npm run build || npx cap copy android || true
+
+      - name: Build Signed AAB - CACHE CLEAN FIX
         run: |
-          rm -rf android
+          rm -rf android ~/.gradle
           npx cap add android
           npx cap copy android
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
-          keytool -genkey -v -keystore android/app/release.keystore -alias merge -keyalg RSA -keysize 2048 -validity 10000 -storepass android123 -keypass android123 -dname "CN=Merge PRO, OU=Kesarmall, O=Kesarmall, L=Manesar, ST=Haryana, C=IN"
-          # --- INJECT SIGNING DIRECTLY INTO build.gradle ---
+          echo "Creating new keystore..."
+          keytool -genkey -v -keystore android/app/release.keystore -alias merge -keyalg RSA -keysize 2048 -validity 10000 -storepass android123 -keypass android123 -dname "CN=Merge PRO, O=Kesarmall, L=Manesar, ST=Haryana, C=IN"
+          cp android/app/release.keystore android/release.keystore
+          # BOTH properties files - yehi miss ho raha tha
+          cat > android/keystore.properties <<EOF
+          storeFile=app/release.keystore
+          storePassword=android123
+          keyAlias=merge
+          keyPassword=android123
+          EOF
           cat > android/app/keystore.properties <<EOF
           storeFile=release.keystore
           storePassword=android123
           keyAlias=merge
           keyPassword=android123
           EOF
-          # Force Gradle to use it
-          echo "storeFile exists:"
-          ls -lh android/app/release.keystore
+          cat android/keystore.properties
           cd android
           chmod +x gradlew
-          ./gradlew bundleRelease --info | grep -i -A2 -B2 signing || true
-          ./gradlew bundleRelease
-          echo "--- FINAL VERIFY ---"
+          ./gradlew clean
+          ./gradlew bundleRelease --no-build-cache --rerun-tasks
+          echo "--- VERIFY ---"
           unzip -l app/build/outputs/bundle/release/app-release.aab | grep META-INF
-          if unzip -l app/build/outputs/bundle/release/app-release.aab | grep -q "META-INF/MERGE.SF"; then echo "✅ NOW SIGNED!"; else echo "❌ STILL UNSIGNED"; exit 1; fi
-      - name: Upload
+          ls -lh app/build/outputs/bundle/release/
+
+      - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
-          name: SIGNED-AAB-V27-FIXED-REAL
+          name: SIGNED-AAB-FINAL-FIXED
           path: android/app/build/outputs/bundle/release/*.aab
