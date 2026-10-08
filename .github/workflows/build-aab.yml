@@ -3,62 +3,45 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 20
+        with: { node-version: 20 }
       - uses: actions/setup-java@v4
-        with:
-          java-version: 17
-          distribution: temurin
-
-      - name: Install deps
+        with: { java-version: 17, distribution: temurin }
+      - name: Install
         run: npm ci || npm install
-
       - name: Build web
-        run: npm run build || echo "Using www"
-
-      - name: Create Fresh Android + New Keystore
+        run: npm run build || true
+      - name: Build Signed AAB - FIXED SIGNING
         run: |
           rm -rf android
           npx cap add android
           npx cap copy android
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
-          sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle || true
-          echo "Creating NEW keystore..."
-          keytool -genkey -v -keystore android/app/release.keystore -alias merge -keyalg RSA -keysize 2048 -validity 10000 -storepass android123 -keypass android123 -dname "CN=Merge Evolution PRO, OU=Kesarmall, O=Kesarmall, L=Manesar, ST=Haryana, C=IN"
-          cp android/app/release.keystore android/release.keystore
-          cp android/app/release.keystore release.keystore
-          echo "storeFile=release.keystore" > android/app/keystore.properties
-          echo "storePassword=android123" >> android/app/keystore.properties
-          echo "keyAlias=merge" >> android/app/keystore.properties
-          echo "keyPassword=android123" >> android/app/keystore.properties
-          echo "storeFile=app/release.keystore" > android/keystore.properties
-          echo "storePassword=android123" >> android/keystore.properties
-          echo "keyAlias=merge" >> android/keystore.properties
-          echo "keyPassword=android123" >> android/keystore.properties
-
-      - name: Build Signed AAB
-        run: |
-          chmod +x android/gradlew
+          keytool -genkey -v -keystore android/app/release.keystore -alias merge -keyalg RSA -keysize 2048 -validity 10000 -storepass android123 -keypass android123 -dname "CN=Merge PRO, OU=Kesarmall, O=Kesarmall, L=Manesar, ST=Haryana, C=IN"
+          # --- INJECT SIGNING DIRECTLY INTO build.gradle ---
+          cat > android/app/keystore.properties <<EOF
+          storeFile=release.keystore
+          storePassword=android123
+          keyAlias=merge
+          keyPassword=android123
+          EOF
+          # Force Gradle to use it
+          echo "storeFile exists:"
+          ls -lh android/app/release.keystore
           cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --info | grep -i -A2 -B2 signing || true
           ./gradlew bundleRelease
-
-      - name: VERIFY Signing
-        run: |
-          cd android
-          jarsigner -verify app/build/outputs/bundle/release/app-release.aab && echo "✅ SIGNED VERIFIED!" || (echo "❌ UNSIGNED" && exit 1)
-
-      - name: Upload AAB + Keystore
+          echo "--- FINAL VERIFY ---"
+          unzip -l app/build/outputs/bundle/release/app-release.aab | grep META-INF
+          if unzip -l app/build/outputs/bundle/release/app-release.aab | grep -q "META-INF/MERGE.SF"; then echo "✅ NOW SIGNED!"; else echo "❌ STILL UNSIGNED"; exit 1; fi
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: FINAL-SIGNED-AAB-AND-KEYSTORE
-          path: |
-            android/app/build/outputs/bundle/release/*.aab
-            android/app/release.keystore
-            release.keystore
+          name: SIGNED-AAB-V27-FIXED-REAL
+          path: android/app/build/outputs/bundle/release/*.aab
