@@ -1,16 +1,286 @@
-<!--
-  Download the file from /mnt/data/evomerge_start_screen_bigger_agentic_artifact_3_4dfff9732bf8.html and copy its content
-  INSTRUCTIONS: Copy this and paste to GitHub www/index.html
-  1. Open: /mnt/data/evomerge_start_screen_bigger_agentic_artifact_3_4dfff9732bf8.html
-  2. Select All -> Copy
-  3. Paste to GitHub www/index.html
--->
+<!-- Merge Evolution PRO v1.0.27 - No Debug - Ad every 10 - Bigger Board Same Tile - Ads Ready -->
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>Placeholder - evomerge_start_screen_bigger_agentic_artifact_3_4dfff9732bf8.html</title></head>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Merge Evolution PRO V27</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(180deg,#0f0c29,#302b63,#24243e);color:#fff;min-height:100vh;overflow-x:hidden;padding-bottom:60px}
+#start-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center}
+#start-screen h1{font-size:clamp(34px,9vw,58px);font-weight:900;letter-spacing:-1.5px;margin:0;line-height:.88;background:linear-gradient(90deg,#ffde59,#ff914d,#ff3131);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 20px rgba(255,100,50,.3))}
+#start-screen p.sub{opacity:.7;margin:12px 0 34px;font-size:13px;letter-spacing:3px;text-transform:uppercase}
+.mode-btn{width:100%;max-width:320px;padding:18px;margin:8px 0;border:none;border-radius:16px;font-weight:900;font-size:18px;letter-spacing:1px;cursor:pointer;transition:transform .12s, box-shadow .12s;color:#fff;box-shadow:0 8px 0 rgba(0,0,0,.25)}
+.mode-btn:active{transform:translateY(2px) scale(.98);box-shadow:0 4px 0 rgba(0,0,0,.25)}
+.mode-btn.classic{background:linear-gradient(135deg,#6a82fb,#fc5c7d)}
+.mode-btn.time{background:linear-gradient(135deg,#f7971e,#ffd200);color:#000}
+.mode-btn.endless{background:linear-gradient(135deg,#00c9ff,#92fe9d);color:#000}
+.presented{position:fixed;bottom:62px;left:0;right:0;text-align:center;font-size:11px;letter-spacing:2.5px;opacity:.55;text-transform:uppercase}
+#game-screen{display:none;flex-direction:column;align-items:center;padding:12px 8px 90px}
+#game-screen.active{display:flex}
+.top-bar{width:98vw;max-width:560px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.stat{background:rgba(255,255,255,.13);padding:8px 12px;border-radius:10px;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.08)}
+.stat b{color:#ffde59}
+#combo-wrap{width:98vw;max-width:560px;height:6px;background:rgba(255,255,255,.15);border-radius:3px;overflow:hidden;margin:6px 0 10px}
+#combo-bar{height:100%;width:0%;background:linear-gradient(90deg,#ffde59,#ff3131);transition:width .05s linear}
+#board-container{width:98vw;max-width:560px;padding:16px;background:rgba(0,0,0,.28);border-radius:22px;backdrop-filter:blur(14px);transform:scale(1.05);transform-origin:top center;margin-top:10px;border:1px solid rgba(255,255,255,.07);box-shadow:0 20px 40px rgba(0,0,0,.4)}
+#board{display:grid;grid-template-columns:repeat(6,58px);gap:10px;justify-content:center}
+.cell{width:58px;height:58px;background:rgba(255,255,255,.08);border-radius:12px;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;user-select:none;transition:all .12s}
+.cell.drag-over{background:rgba(255,255,255,.22);transform:scale(1.06)}
+.tile{width:58px;height:58px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:900;position:relative;box-shadow:0 4px 0 rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.3);cursor:grab;transition:transform .15s;animation:pop .18s ease}
+.tile.selected{box-shadow:0 0 0 3px #ffde59,0 0 22px #ffde59,0 4px 0 rgba(0,0,0,.3);transform:scale(1.09);z-index:2}
+.tile .emoji{font-size:32px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;line-height:1;pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))}
+.tile.mystery{background:linear-gradient(135deg,#ffd200,#ff8c00)!important;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+.powerups{width:98vw;max-width:560px;display:flex;gap:10px;margin:16px 0;justify-content:center}
+.pbtn{padding:11px 18px;border-radius:12px;border:none;background:rgba(255,255,255,.15);color:#fff;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.1);transition:all .12s}
+.pbtn.active{background:#ffde59;color:#000;box-shadow:0 0 18px #ffde59}
+#admob-banner{position:fixed;bottom:0;left:0;right:0;height:50px;background:#0a0a0a;border-top:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;font-size:12px;letter-spacing:1px;color:#888;z-index:1000;font-weight:700}
+#interstitial{position:fixed;inset:0;background:rgba(0,0,0,.86);display:none;align-items:center;justify-content:center;z-index:2000;backdrop-filter:blur(6px)}
+#interstitial.show{display:flex}
+.ad-card{background:#fff;color:#000;padding:26px 22px;border-radius:18px;text-align:center;max-width:320px;width:90%;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.ad-card h3{margin:0 0 8px;font-size:18px}
+.back-btn{margin:10px;padding:8px 16px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-weight:700}
+@media(max-width:400px){#board{gap:8px}#board-container{padding:10px}}
+</style>
+</head>
 <body>
-<h1>Replace with real file: evomerge_start_screen_bigger_agentic_artifact_3_4dfff9732bf8.html</h1>
-<p>Source: /mnt/data/evomerge_start_screen_bigger_agentic_artifact_3_4dfff9732bf8.html</p>
-<p>Target: www/index.html</p>
+<div id="start-screen">
+<h1>MERGE<br>EVOLUTION<br>PRO</h1>
+<p class="sub">V27 • 100 Levels Egg to GOD</p>
+<button class="mode-btn classic" onclick="startGame('classic')">CLASSIC</button>
+<button class="mode-btn time" onclick="startGame('time')">TIME ATTACK</button>
+<button class="mode-btn endless" onclick="startGame('endless')">ENDLESS</button>
+<div class="presented">Presented by Kesarmal Innovations</div>
+</div>
+<div id="game-screen">
+<button class="back-btn" onclick="goHome()">← MENU</button>
+<div class="top-bar">
+<div class="stat">🪙 <b id="coins">0</b></div>
+<div class="stat">⭐ <b id="xp">0</b> Lv <b id="lvl">1</b></div>
+<div class="stat"><span style="color:#ff4500">🔥</span> <b id="streak">0</b></div>
+<div class="stat">💥 <b id="combo">0</b>x</div>
+<div class="stat" id="timer-stat" style="display:none">⏱️ <b id="time-left">120</b>s</div>
+</div>
+<div id="combo-wrap"><div id="combo-bar"></div></div>
+<div id="board-container"><div id="board"></div></div>
+<div class="powerups">
+<button class="pbtn" id="hammer-btn" onclick="activateHammer()">🔨 Hammer 20</button>
+<button class="pbtn" id="magnet-btn" onclick="activateMagnet()">🧲 Magnet 30</button>
+</div>
+</div>
+<div id="admob-banner">AdMob BANNER • 320x50 - Your Ad Here</div>
+<div id="interstitial"><div class="ad-card"><h3>Advertisement</h3><p>Interstitial Ad • Your Ad Here</p><small>Closing in 2s...</small></div></div>
+<script>
+var EVOS=[
+{emoji:'🥚',name:'Egg'},{emoji:'🐣',name:'Crack'},{emoji:'🐤',name:'Chick'},{emoji:'🐥',name:'Fluff'},{emoji:'🐔',name:'Hen'},{emoji:'🕊️',name:'Dove'},{emoji:'🦆',name:'Duck'},{emoji:'🦢',name:'Swan'},{emoji:'🦉',name:'Owl'},{emoji:'🦅',name:'Eagle'},
+{emoji:'🦜',name:'Parrot'},{emoji:'🦩',name:'Flamingo'},{emoji:'🐧',name:'Penguin'},{emoji:'🐦',name:'Sparrow'},{emoji:'🦚',name:'Peacock'},{emoji:'🦃',name:'Turkey'},{emoji:'🐿️',name:'Squirrel'},{emoji:'🐇',name:'Bunny'},{emoji:'🐰',name:'Rabbit'},{emoji:'🦊',name:'Fox'},
+{emoji:'🐺',name:'Wolf'},{emoji:'🐻',name:'Bear'},{emoji:'🐨',name:'Koala'},{emoji:'🐼',name:'Panda'},{emoji:'🦁',name:'Lion'},{emoji:'🐯',name:'Tiger'},{emoji:'🦒',name:'Giraffe'},{emoji:'🦓',name:'Zebra'},{emoji:'🦏',name:'Rhino'},{emoji:'🦛',name:'Hippo'},
+{emoji:'🐘',name:'Elephant'},{emoji:'🦘',name:'Kangaroo'},{emoji:'🦥',name:'Sloth'},{emoji:'🦦',name:'Otter'},{emoji:'🦡',name:'Badger'},{emoji:'🦫',name:'Beaver'},{emoji:'🦔',name:'Hedgehog'},{emoji:'🦨',name:'Skunk'},{emoji:'🐊',name:'Croc'},{emoji:'🐢',name:'Turtle'},
+{emoji:'🦎',name:'Lizard'},{emoji:'🐍',name:'Snake'},{emoji:'🦂',name:'Scorpion'},{emoji:'🕷️',name:'Spider'},{emoji:'🦀',name:'Crab'},{emoji:'🦞',name:'Lobster'},{emoji:'🦐',name:'Shrimp'},{emoji:'🦑',name:'Squid'},{emoji:'🐙',name:'Octopus'},{emoji:'🐡',name:'Puffer'},
+{emoji:'🐠',name:'Tropical'},{emoji:'🐟',name:'Fish'},{emoji:'🐋',name:'Whale'},{emoji:'🦈',name:'Shark'},{emoji:'🐉',name:'Dragon'},{emoji:'🐲',name:'Drake'},{emoji:'🦕',name:'Sauro'},{emoji:'🦖',name:'T-Rex'},{emoji:'🦄',name:'Unicorn'},{emoji:'👾',name:'Monster'},
+{emoji:'🤖',name:'Robot'},{emoji:'👽',name:'Alien'},{emoji:'👹',name:'Ogre'},{emoji:'👻',name:'Ghost'},{emoji:'💀',name:'Skull'},{emoji:'🧙',name:'Wizard'},{emoji:'🧝',name:'Elf'},{emoji:'🧛',name:'Vampire'},{emoji:'🧜',name:'Merfolk'},{emoji:'🧞',name:'Genie'},
+{emoji:'🦸',name:'Hero'},{emoji:'🦹',name:'Villain'},{emoji:'👑',name:'King'},{emoji:'💎',name:'Diamond'},{emoji:'🔥',name:'Flame'},{emoji:'⚡',name:'Bolt'},{emoji:'🌟',name:'Star'},{emoji:'🌈',name:'Rainbow'},{emoji:'☄️',name:'Comet'},{emoji:'🌌',name:'Galaxy'},
+{emoji:'🪐',name:'Planet'},{emoji:'🌞',name:'Sun'},{emoji:'🌙',name:'Moon'},{emoji:'⭐',name:'Nova'},{emoji:'✨',name:'Spark'},{emoji:'💫',name:'Dizzy'},{emoji:'🌀',name:'Vortex'},{emoji:'🧬',name:'DNA'},{emoji:'🕳️',name:'Void'},{emoji:'🕉️',name:'Om'},
+{emoji:'♾️',name:'Infinity'},{emoji:'🧿',name:'Eye'},{emoji:'🔮',name:'Orb'},{emoji:'🗿',name:'Titan'},{emoji:'🏛️',name:'Temple'},{emoji:'⛩️',name:'Shrine'},{emoji:'🌠',name:'Shooting'},{emoji:'💥',name:'Blast'},{emoji:'🌟',name:'Super Nova'},{emoji:'👁️',name:'GOD'}
+];
+var board=Array(36).fill(null);
+var selected=null;
+var coins=0,xp=0,gameLevel=1,streak=0,combo=0,merges=0;
+var comboTimeout=null,comboInterval=null,comboLeft=0;
+var hammerActive=false;
+var gameMode=null;
+var spawnInt=null,mysteryTO=null,timeInt=null,timeLeft=120;
+var highestMerge=0;
+
+function startGame(mode){
+ gameMode=mode;
+ document.getElementById('start-screen').style.display='none';
+ document.getElementById('game-screen').classList.add('active');
+ if(mode==='time'){document.getElementById('timer-stat').style.display='flex';timeLeft=120;startTimeAttack();}else{document.getElementById('timer-stat').style.display='none';}
+ initBoard();
+ loadIfNeeded();
+ startSpawning();
+ scheduleMystery();
+}
+function goHome(){
+ stopAll();
+ document.getElementById('game-screen').classList.remove('active');
+ document.getElementById('start-screen').style.display='flex';
+}
+function stopAll(){
+ if(spawnInt) clearInterval(spawnInt);
+ if(mysteryTO) clearTimeout(mysteryTO);
+ if(timeInt) clearInterval(timeInt);
+ if(comboInterval) clearInterval(comboInterval);
+ if(comboTimeout) clearTimeout(comboTimeout);
+}
+function initBoard(){
+ board=Array(36).fill(null);
+ for(var i=0;i<5;i++) spawnTile();
+ render();updateStats();
+}
+function getEmpty(){var e=[];for(var i=0;i<board.length;i++){if(board[i]===null) e.push(i);}return e;}
+function spawnTile(lvl){
+ var empties=getEmpty(); if(!empties.length) return false;
+ var idx=empties[Math.floor(Math.random()*empties.length)];
+ var level = lvl!==undefined ? lvl : (Math.random()<0.82 ? 0 : 1);
+ if(level>=100) level=99;
+ board[idx]={lvl:level,chest:false};
+ render(); return true;
+}
+function spawnMystery(){
+ var empties=getEmpty(); if(!empties.length) return;
+ var idx=empties[Math.floor(Math.random()*empties.length)];
+ board[idx]={lvl: Math.min(highestMerge,99), chest:true};
+ render();
+ setTimeout(function(){ if(board[idx] && board[idx].chest){board[idx]=null;render();} },8000);
+}
+function scheduleMystery(){
+ var delay=30000+Math.random()*15000;
+ mysteryTO=setTimeout(function(){spawnMystery();scheduleMystery();},delay);
+}
+function startSpawning(){spawnInt=setInterval(function(){spawnTile();checkOver();},2000);}
+function startTimeAttack(){
+ timeInt=setInterval(function(){
+  timeLeft--; document.getElementById('time-left').textContent=timeLeft;
+  if(timeLeft<=0){clearInterval(timeInt);alert('Time Up! Score: '+coins);goHome();}
+ },1000);
+}
+function render(){
+ var boardEl=document.getElementById('board');
+ boardEl.innerHTML='';
+ for(var i=0;i<board.length;i++){
+  (function(idx){
+   var cell=board[idx];
+   var c=document.createElement('div');
+   c.className='cell';
+   c.dataset.index=idx;
+   c.addEventListener('dragover',function(e){e.preventDefault();c.classList.add('drag-over');});
+   c.addEventListener('dragleave',function(){c.classList.remove('drag-over');});
+   c.addEventListener('drop',function(e){e.preventDefault();c.classList.remove('drag-over');handleDrop(idx);});
+   c.addEventListener('click',function(){handleTap(idx);});
+   if(cell!==null){
+    var t=document.createElement('div');
+    t.className='tile'+(selected===idx?' selected':'')+(cell.chest?' mystery':'');
+    if(!cell.chest){
+     var hue=(cell.lvl*3.6)%360;
+     t.style.background='linear-gradient(135deg,hsl('+hue+',85%,65%),hsl('+((hue+20)%360)+',75%,45%))';
+    }
+    t.draggable=true;
+    t.addEventListener('dragstart',function(e){selected=idx;e.dataTransfer.setData('text/plain',idx);setTimeout(render,0);});
+    var em=document.createElement('span');
+    em.className='emoji';
+    em.textContent=cell.chest ? '🎁' : EVOS[cell.lvl].emoji;
+    t.appendChild(em);
+    c.appendChild(t);
+   }
+   boardEl.appendChild(c);
+  })(i);
+ }
+}
+function handleTap(idx){
+ if(hammerActive){
+  if(board[idx]!==null){board[idx]=null;coins+=5;hammerActive=false;document.getElementById('hammer-btn').classList.remove('active');render();updateStats();save();}
+  return;
+ }
+ if(board[idx] && board[idx].chest){
+  coins+=60+Math.floor(Math.random()*40);
+  xp+=25;
+  board[idx]=null;
+  streak++;combo++;triggerCombo();updateStats();render();save();return;
+ }
+ if(selected===null){
+  if(board[idx]!==null){selected=idx;render();}
+ } else {
+  if(selected===idx){selected=null;render();return;}
+  attemptMerge(selected,idx);
+ }
+}
+function handleDrop(to){if(selected!==null) attemptMerge(selected,to);}
+function attemptMerge(from,to){
+ if(from===to){selected=null;render();return;}
+ var a=board[from],b=board[to];
+ if(!a||!b){selected=null;render();return;}
+ if(a.chest||b.chest){selected=null;render();return;}
+ if(a.lvl!==b.lvl){streak=0;selected=to;render();updateStats();return;}
+ var newLvl=a.lvl+1; if(newLvl>=100) newLvl=99;
+ board[to]={lvl:newLvl,chest:false};
+ board[from]=null;
+ selected=null;
+ merges++;highestMerge=Math.max(highestMerge,newLvl);
+ coins+=(newLvl+1)*2; xp+=(newLvl+1)*3; streak++; combo++;
+ triggerCombo(); checkRewards(newLvl,to); render(); updateStats(); maybeAd(); save(); checkOver();
+}
+function triggerCombo(){
+ comboLeft=100; document.getElementById('combo-bar').style.width='100%';
+ if(comboInterval) clearInterval(comboInterval);
+ if(comboTimeout) clearTimeout(comboTimeout);
+ comboInterval=setInterval(function(){
+  comboLeft-=2.5; if(comboLeft<=0){comboLeft=0;clearInterval(comboInterval);combo=0;updateStats();}
+  document.getElementById('combo-bar').style.width=comboLeft+'%';
+ },50);
+ comboTimeout=setTimeout(function(){combo=0;updateStats();document.getElementById('combo-bar').style.width='0%';},2000);
+}
+function checkRewards(newLvl,idx){
+ if(combo===3){
+  var empties=getEmpty(); if(empties.length){var near=empties[0]; board[near]={lvl:0,chest:true};}
+ }
+ if(combo===5){
+  var empties=getEmpty(); if(empties.length){var r=empties[Math.floor(Math.random()*empties.length)]; board[r]={lvl:Math.max(0,newLvl-2),chest:false};}
+ }
+ if(combo>=10){
+  var empties=getEmpty(); if(empties.length){var r2=empties[Math.floor(Math.random()*empties.length)]; var rare=Math.min(99,newLvl+5+Math.floor(Math.random()*5)); board[r2]={lvl:rare,chest:false}; combo=0;}
+ }
+}
+function updateStats(){
+ document.getElementById('coins').textContent=coins;
+ document.getElementById('xp').textContent=xp;
+ document.getElementById('lvl').textContent=Math.floor(xp/100)+1;
+ document.getElementById('streak').textContent=streak;
+ document.getElementById('combo').textContent=combo;
+ gameLevel=Math.floor(xp/100)+1;
+}
+function maybeAd(){
+ if(merges%10===0 && merges>0){
+  var el=document.getElementById('interstitial'); el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},2000);
+ }
+}
+function activateHammer(){
+ if(hammerActive){hammerActive=false;document.getElementById('hammer-btn').classList.remove('active');return;}
+ if(coins<20){alert('Need 20 coins');return;}
+ coins-=20; hammerActive=true;
+ document.getElementById('hammer-btn').classList.add('active');
+ document.getElementById('magnet-btn').classList.remove('active');
+ updateStats();
+}
+function activateMagnet(){
+ if(coins<30){alert('Need 30 coins');return;}
+ var map={}; var found=false;
+ for(var i=0;i<board.length;i++){ if(board[i] && !board[i].chest){ var l=board[i].lvl; if(map[l]!==undefined){ coins-=30; attemptMerge(map[l],i); found=true; break; } else map[l]=i; } }
+ if(!found) alert('No pair found');
+ else updateStats();
+}
+function checkOver(){
+ if(getEmpty().length===0){
+  setTimeout(function(){ if(getEmpty().length===0){alert('Board Full! Score: '+coins); stopAll(); goHome();} },600);
+ }
+}
+function save(){
+ if(gameLevel>=10){
+  try{localStorage.setItem('mergeV27', JSON.stringify({board:board,coins:coins,xp:xp,streak:streak,merges:merges,highestMerge:highestMerge}));}catch(e){}
+ }
+}
+function loadIfNeeded(){
+ try{
+  var data=JSON.parse(localStorage.getItem('mergeV27')||'null');
+  if(data && data.coins){coins=data.coins||0; xp=data.xp||0;}
+ }catch(e){}
+}
+document.addEventListener('contextmenu',function(e){e.preventDefault();});
+</script>
 </body>
 </html>
