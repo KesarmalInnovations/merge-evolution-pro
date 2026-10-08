@@ -38,7 +38,7 @@ jobs:
               p.write_text(t)
           PY
           python3 /tmp/fix.py
-          NEW_CODE=10
+          NEW_CODE=11
           sed -i "s/versionCode [0-9]*/versionCode $NEW_CODE/" android/app/build.gradle
           ls -lh release.keystore
           chmod +x android/gradlew
