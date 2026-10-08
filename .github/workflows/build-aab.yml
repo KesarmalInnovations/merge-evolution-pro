@@ -9,11 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-
       - uses: actions/setup-java@v4
         with:
           java-version: 17
@@ -25,18 +23,11 @@ jobs:
       - name: Build web
         run: npm run build || echo "Using www"
 
-      - name: Fix Android Platform - gradlew missing fix
+      - name: Recreate Android Fresh
         run: |
-          echo "Checking android/gradlew..."
-          ls -la android/ || echo "No android folder"
-          # If gradlew missing, recreate android platform
-          if [ ! -f "android/gradlew" ]; then
-            echo "gradlew missing! Recreating android platform..."
-            rm -rf android
-            npx cap add android
-          fi
-          npx cap copy android || true
-          ls -la android/gradlew
+          rm -rf android
+          npx cap add android
+          npx cap copy android
 
       - name: FORCE minSdk 24
         run: |
@@ -44,15 +35,12 @@ jobs:
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle || true
           cat android/variables.gradle
 
-      - name: Setup Keystore - USING YOUR COMMITTED KEYSTORE
+      - name: Setup Keystore From Repo
         run: |
-          # Use your committed release.keystore (old working method)
-          cp release.keystore android/app/release.keystore || true
-          cp release.keystore android/release.keystore || true
-          # Also try from secrets as backup
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/k.store || true
-          if [ -s /tmp/k.store ]; then cp /tmp/k.store android/app/release.keystore; cp /tmp/k.store android/release.keystore; fi
-          ls -lh android/app/release.keystore
+          echo "Using your committed release.keystore"
+          ls -lh release.keystore
+          cp release.keystore android/app/release.keystore
+          cp release.keystore android/release.keystore
           echo "storeFile=release.keystore" > android/app/keystore.properties
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/app/keystore.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
@@ -67,6 +55,19 @@ jobs:
           chmod +x android/gradlew
           cd android
           ./gradlew bundleRelease
+
+      - name: VERIFY - Is AAB Signed or Not?
+        run: |
+          cd android
+          echo "=== Checking if AAB is signed ==="
+          if unzip -l app/build/outputs/bundle/release/app-release.aab | grep -q "META-INF"; then
+            echo "✅ META-INF found — checking signature..."
+            unzip -l app/build/outputs/bundle/release/app-release.aab | grep META-INF
+            jarsigner -verify app/build/outputs/bundle/release/app-release.aab || (echo "❌ NOT SIGNED!" && exit 1)
+          else
+            echo "❌ NO META-INF — AAB IS UNSIGNED! Passwords are wrong!"
+            exit 1
+          fi
 
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
