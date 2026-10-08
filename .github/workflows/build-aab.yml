@@ -23,18 +23,21 @@ jobs:
         run: npm ci || npm install
 
       - name: Build web
-        run: npm run build || echo "Using www folder"
+        run: npm run build || echo "Using www"
 
-      - name: Add Android
-        run: npx cap add android || true
+      - name: Add Android Platform
+        run: |
+          # Clean and add fresh
+          rm -rf android || true
+          npx cap add android || true
+          ls -la android/ || true
 
       - name: Copy web to Android
-        run: npx cap copy android || true
+        run: npx cap copy android || npx cap sync android || true
 
-      - name: FORCE minSdk 24 and AD_ID - FIXED
+      - name: FORCE minSdk 24 and AD_ID
         run: |
           echo "=== Fixing minSdk 24 ==="
-          mkdir -p android
           cat > android/variables.gradle << 'EOF'
           ext {
               minSdkVersion = 24
@@ -51,17 +54,11 @@ jobs:
           }
           EOF
           cat android/variables.gradle
-          echo "=== Fixing AD_ID - safe mode ==="
           chmod +x ./fix-ad-id.sh || true
-          ./fix-ad-id.sh || echo "fix-ad-id.sh not found, trying manual"
-          # Only try manifest if it exists
+          ./fix-ad-id.sh || true
           if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
-            echo "Manifest found, adding AD_ID"
             grep -q "AD_ID" android/app/src/main/AndroidManifest.xml || sed -i '/<manifest/a \    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml || true
-          else
-            echo "Manifest not found yet, skipping AD_ID - will be added after sync"
           fi
-          echo "=== Done ==="
 
       - name: Setup Keystore
         run: |
@@ -71,10 +68,19 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/keystore.properties
 
-      - name: Build AAB
+      - name: Build AAB - FIXED FOR GRADLEW
         run: |
+          echo "Checking for gradlew..."
+          ls -la android/ | grep gradlew || true
+          # If gradlew missing, restore
+          if [ ! -f "android/gradlew" ]; then
+            echo "gradlew missing, reinstalling android platform..."
+            rm -rf android
+            npx cap add android
+            npx cap copy android
+          fi
+          chmod +x android/gradlew
           cd android
-          chmod +x gradlew
           ./gradlew bundleRelease
 
       - name: Upload Signed AAB
