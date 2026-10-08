@@ -23,57 +23,51 @@ jobs:
         run: npm ci || npm install
 
       - name: Build web
-        run: npm run build || echo "Using www folder"
+        run: npm run build || echo "Using www"
 
-      - name: Add Android Platform
+      - name: Add Android if missing
         run: |
-          rm -rf android || true
-          npx cap add android
-          npx cap copy android
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap copy android || true
 
-      - name: FORCE minSdk 24 and AD_ID
+      - name: FORCE minSdk 24
         run: |
-          echo "=== Fixing minSdk 24 ==="
-          cat android/variables.gradle
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle || true
           cat android/variables.gradle
-          chmod +x ./fix-ad-id.sh || true
-          ./fix-ad-id.sh || true
-          if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
-            grep -q "AD_ID" android/app/src/main/AndroidManifest.xml || sed -i '/<manifest/a \    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml || true
-          fi
 
-      - name: Setup Keystore - FIXED FOR SIGNING
+      - name: Setup Keystore - USING YOUR COMMITTED KEYSTORE
         run: |
-          echo "Setting up keystore for signing..."
-          # Check if secrets exist
-          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "ERROR: KEYSTORE_BASE64 secret is empty! Go to GitHub -> Settings -> Secrets and add it"
-            exit 1
+          echo "Using release.keystore from repo root (your old working method)"
+          ls -lh release.keystore || echo "No root keystore"
+          # Copy your committed keystore to app folder
+          cp release.keystore android/app/release.keystore || true
+          cp release.keystore android/release.keystore || true
+          # Also decode from secret as backup
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/decoded.keystore || true
+          if [ -s /tmp/decoded.keystore ]; then
+            cp /tmp/decoded.keystore android/app/release.keystore
+            cp /tmp/decoded.keystore android/release.keystore
           fi
-          # Create keystore in BOTH locations
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
-          cp android/app/release.keystore android/release.keystore || true
-          ls -lh android/app/release.keystore android/release.keystore
-          # Create keystore.properties in BOTH locations with correct paths
+          ls -lh android/app/release.keystore
+          # Create properties
           echo "storeFile=release.keystore" > android/app/keystore.properties
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/app/keystore.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
-          # Also in root android folder for safety
           echo "storeFile=app/release.keystore" > android/keystore.properties
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/keystore.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/keystore.properties
-          echo "Keystore setup done:"
-          ls -lh android/*.properties android/app/*.properties || true
+          cat android/app/keystore.properties | grep -v Password
 
       - name: Build Signed AAB
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew bundleRelease --info
+          ./gradlew bundleRelease
           ls -lh app/build/outputs/bundle/release/
 
       - name: Upload Signed AAB
