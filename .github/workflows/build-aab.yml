@@ -1,4 +1,4 @@
-name: FINAL V22 - SEPARATE FILE AD_ID FIX
+name: FINAL V23 - AD_ID FIX WITH SEPARATE FILE
 
 on:
   push:
@@ -35,14 +35,14 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
 
-      - name: Patch Gradle V22
+      - name: Patch Gradle V23
         run: |
           python3 << 'PY'
           import pathlib, re
           bg = pathlib.Path("android/app/build.gradle")
           t = bg.read_text()
-          t = re.sub(r'versionCode\s+\d+', 'versionCode 22', t)
-          t = re.sub(r'versionName\s+".*?"', 'versionName "1.0.22"', t)
+          t = re.sub(r'versionCode\s+\d+', 'versionCode 23', t)
+          t = re.sub(r'versionName\s+".*?"', 'versionName "1.0.23"', t)
           if "keystorePropertiesFile" not in t:
               t = t.replace("android {", 'def keystorePropertiesFile = rootProject.file("app/keystore.properties")\ndef keystoreProperties = new Properties()\nif (keystorePropertiesFile.exists()) {\n    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))\n}\n\nandroid {', 1)
           if "signingConfigs" not in t:
@@ -72,5 +72,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SIGNED-AAB-V22-ADS-FIXED
+          name: SIGNED-AAB-V23-ADS-FIXED
           path: android/app/build/outputs/bundle/release/app-release.aab
