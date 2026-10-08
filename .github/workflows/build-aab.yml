@@ -1,64 +1,31 @@
 name: Build Signed AAB
-
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: 17
           distribution: temurin
-
-      - name: Install dependencies
-        run: npm ci || npm install
-
-      - name: Build web
-        run: npm run build || echo "No build script, using www folder"
-
-      - name: Add Android platform
-        run: npx cap add android || true
-
-      - name: Copy web to Android
-        run: npx cap copy android
-
-      - name: Fix AD_ID permission for Ads
+      - run: npm ci || npm install
+      - run: npm run build || echo "No build"
+      - run: npx cap add android || true
+      - run: npx cap copy android
+      - name: Fix AD_ID and minSdk 24
         run: |
-          echo "Adding AD_ID permission..."
           chmod +x ./fix-ad-id.sh || true
           ./fix-ad-id.sh || true
-          # Fallback if fix-ad-id.sh fails
-          if ! grep -q "AD_ID" android/app/src/main/AndroidManifest.xml; then
-            sed -i '/<manifest/a \    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml
-          fi
-          cat android/app/src/main/AndroidManifest.xml | grep AD_ID || true
-
-      - name: Fix minSdkVersion to 24 for Play Protect
-        run: |
-          echo "Fixing minSdkVersion 22 -> 24..."
-          # Fix in variables.gradle
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
           sed -i 's/22/24/g' android/variables.gradle || true
-          # Fix in build.gradle
           sed -i 's/minSdkVersion 22/minSdkVersion 24/g' android/app/build.gradle || true
-          echo "Checking fixed values:"
-          grep -r "minSdk" android/ || true
-          cat android/variables.gradle
-
       - name: Setup Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
@@ -66,15 +33,8 @@ jobs:
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/keystore.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/keystore.properties
-
-      - name: Build Signed AAB
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew bundleRelease
-
-      - name: Upload Signed AAB
-        uses: actions/upload-artifact@v4
+      - run: cd android && chmod +x gradlew && ./gradlew bundleRelease
+      - uses: actions/upload-artifact@v4
         with:
           name: SIGNED-AAB-V27-FINAL-MINSDK24-ADS-FIXED
           path: android/app/build/outputs/bundle/release/*.aab
