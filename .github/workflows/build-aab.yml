@@ -30,7 +30,7 @@ jobs:
           sed -i 's/targetSdkVersion = 34/targetSdkVersion = 36/g' android/variables.gradle || true
           sed -i 's/compileSdkVersion = 34/compileSdkVersion = 36/g' android/variables.gradle || true
           sed -i 's/<application/<uses-permission android:name="com.google.android.gms.permission.AD_ID" \/> <application/' android/app/src/main/AndroidManifest.xml || true
-          NEW_CODE=8
+          NEW_CODE=9
           sed -i "s/versionCode [0-9]*/versionCode $NEW_CODE/" android/app/build.gradle
           ls -lh release.keystore
           chmod +x android/gradlew
