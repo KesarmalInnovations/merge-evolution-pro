@@ -25,12 +25,18 @@ jobs:
       - name: Build web
         run: npm run build || echo "Using www"
 
-      - name: Add Android if missing
+      - name: Fix Android Platform - gradlew missing fix
         run: |
-          if [ ! -d "android" ]; then
+          echo "Checking android/gradlew..."
+          ls -la android/ || echo "No android folder"
+          # If gradlew missing, recreate android platform
+          if [ ! -f "android/gradlew" ]; then
+            echo "gradlew missing! Recreating android platform..."
+            rm -rf android
             npx cap add android
           fi
           npx cap copy android || true
+          ls -la android/gradlew
 
       - name: FORCE minSdk 24
         run: |
@@ -40,19 +46,13 @@ jobs:
 
       - name: Setup Keystore - USING YOUR COMMITTED KEYSTORE
         run: |
-          echo "Using release.keystore from repo root (your old working method)"
-          ls -lh release.keystore || echo "No root keystore"
-          # Copy your committed keystore to app folder
+          # Use your committed release.keystore (old working method)
           cp release.keystore android/app/release.keystore || true
           cp release.keystore android/release.keystore || true
-          # Also decode from secret as backup
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/decoded.keystore || true
-          if [ -s /tmp/decoded.keystore ]; then
-            cp /tmp/decoded.keystore android/app/release.keystore
-            cp /tmp/decoded.keystore android/release.keystore
-          fi
+          # Also try from secrets as backup
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/k.store || true
+          if [ -s /tmp/k.store ]; then cp /tmp/k.store android/app/release.keystore; cp /tmp/k.store android/release.keystore; fi
           ls -lh android/app/release.keystore
-          # Create properties
           echo "storeFile=release.keystore" > android/app/keystore.properties
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/app/keystore.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
@@ -61,14 +61,12 @@ jobs:
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/keystore.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/keystore.properties
-          cat android/app/keystore.properties | grep -v Password
 
       - name: Build Signed AAB
         run: |
           chmod +x android/gradlew
           cd android
           ./gradlew bundleRelease
-          ls -lh app/build/outputs/bundle/release/
 
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
