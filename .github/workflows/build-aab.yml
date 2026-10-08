@@ -13,30 +13,26 @@ jobs:
       - uses: actions/setup-java@v4
         with: { java-version: 17, distribution: temurin }
 
-      - name: Install deps
+      - name: Install
         run: npm ci || npm install
-
       - name: Build web
-        run: npm run build || npx cap copy android || true
+        run: npm run build || true
 
-      - name: Build Signed AAB - CACHE CLEAN FIX
+      - name: Build SIGNED AAB - ABSOLUTE PATH
         run: |
-          rm -rf android ~/.gradle
+          rm -rf android
           npx cap add android
           npx cap copy android
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
-          echo "Creating new keystore..."
+          sed -i 's/minSdk = 22/minSdk = 24/g' android/variables.gradle || true
+          echo "--- Creating keystore ---"
           keytool -genkey -v -keystore android/app/release.keystore -alias merge -keyalg RSA -keysize 2048 -validity 10000 -storepass android123 -keypass android123 -dname "CN=Merge PRO, O=Kesarmall, L=Manesar, ST=Haryana, C=IN"
-          cp android/app/release.keystore android/release.keystore
-          # BOTH properties files - yehi miss ho raha tha
+          echo "--- Absolute path fix ---"
+          KS_PATH="$(pwd)/android/app/release.keystore"
+          echo "Keystore at: $KS_PATH"
+          ls -lh $KS_PATH
           cat > android/keystore.properties <<EOF
-          storeFile=app/release.keystore
-          storePassword=android123
-          keyAlias=merge
-          keyPassword=android123
-          EOF
-          cat > android/app/keystore.properties <<EOF
-          storeFile=release.keystore
+          storeFile=$KS_PATH
           storePassword=android123
           keyAlias=merge
           keyPassword=android123
@@ -46,12 +42,13 @@ jobs:
           chmod +x gradlew
           ./gradlew clean
           ./gradlew bundleRelease --no-build-cache --rerun-tasks
-          echo "--- VERIFY ---"
-          unzip -l app/build/outputs/bundle/release/app-release.aab | grep META-INF
+          echo "--- VERIFY SIGNED ---"
           ls -lh app/build/outputs/bundle/release/
+          unzip -l app/build/outputs/bundle/release/app-release.aab | grep -E "BUNDLE|META-INF/.*\.SF|META-INF/.*\.RSA"
+          if unzip -l app/build/outputs/bundle/release/app-release.aab | grep -q "BUNDLE.SF"; then echo "✅ SIGNED CONFIRMED"; else echo "❌ STILL UNSIGNED"; exit 1; fi
 
-      - name: Upload Signed AAB
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: SIGNED-AAB-FINAL-FIXED
+          name: SIGNED-AAB-ABSOLUTE-FINAL
           path: android/app/build/outputs/bundle/release/*.aab
