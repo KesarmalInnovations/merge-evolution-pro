@@ -23,26 +23,20 @@ jobs:
         run: npm ci || npm install
 
       - name: Build web
-        run: npm run build || echo "Using www"
+        run: npm run build || echo "Using www folder"
 
       - name: Add Android Platform
         run: |
           rm -rf android || true
           npx cap add android
-          ls -la android/
+          npx cap copy android
 
-      - name: Copy web to Android
-        run: npx cap copy android
-
-      - name: FORCE minSdk 24 and AD_ID - FINAL FIX
+      - name: FORCE minSdk 24 and AD_ID
         run: |
-          echo "=== BEFORE ==="
+          echo "=== Fixing minSdk 24 ==="
           cat android/variables.gradle
-          # ONLY change minSdk, don't overwrite whole file
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
-          sed -i 's/minSdkVersion = 23/minSdkVersion = 24/g' android/variables.gradle || true
           sed -i 's/minSdkVersion = .*/minSdkVersion = 24/' android/variables.gradle || true
-          echo "=== AFTER ==="
           cat android/variables.gradle
           chmod +x ./fix-ad-id.sh || true
           ./fix-ad-id.sh || true
@@ -50,19 +44,37 @@ jobs:
             grep -q "AD_ID" android/app/src/main/AndroidManifest.xml || sed -i '/<manifest/a \    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' android/app/src/main/AndroidManifest.xml || true
           fi
 
-      - name: Setup Keystore
+      - name: Setup Keystore - FIXED FOR SIGNING
         run: |
+          echo "Setting up keystore for signing..."
+          # Check if secrets exist
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "ERROR: KEYSTORE_BASE64 secret is empty! Go to GitHub -> Settings -> Secrets and add it"
+            exit 1
+          fi
+          # Create keystore in BOTH locations
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
-          echo "storeFile=release.keystore" > android/keystore.properties
+          cp android/app/release.keystore android/release.keystore || true
+          ls -lh android/app/release.keystore android/release.keystore
+          # Create keystore.properties in BOTH locations with correct paths
+          echo "storeFile=release.keystore" > android/app/keystore.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/app/keystore.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/app/keystore.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/app/keystore.properties
+          # Also in root android folder for safety
+          echo "storeFile=app/release.keystore" > android/keystore.properties
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/keystore.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/keystore.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/keystore.properties
+          echo "Keystore setup done:"
+          ls -lh android/*.properties android/app/*.properties || true
 
-      - name: Build AAB
+      - name: Build Signed AAB
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease --info
+          ls -lh app/build/outputs/bundle/release/
 
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
