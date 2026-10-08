@@ -15,7 +15,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - name: Build AAB with ORIGINAL key
+      - name: Build AAB
+        env:
+          STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           npm ci || npm install
           npm run build || true
@@ -24,21 +28,19 @@ jobs:
           npx cap copy android
           sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle || true
           NEW_CODE=$(date +%s)
-          echo "Bumping to $NEW_CODE"
+          echo "Version $NEW_CODE"
           sed -i "s/versionCode [0-9]*/versionCode $NEW_CODE/" android/app/build.gradle
-          sed -i "s/versionName \".*\"/versionName \"1.0.$NEW_CODE\"/" android/app/build.gradle
-          grep -E "versionCode|versionName" android/app/build.gradle
+          sed -i 's/versionName ".*"/versionName "1.0.'$NEW_CODE'"/' android/app/build.gradle
           ls -lh release.keystore
           cd android
           chmod +x gradlew
-         ./gradlew clean bundleRelease
-          cd..
-          AAB="android/app/build/outputs/bundle/release/app-release.aab"
-          ls -lh $AAB
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore release.keystore -storepass ${{ secrets.KEYSTORE_PASSWORD }} -keypass ${{ secrets.KEY_PASSWORD }} $AAB ${{ secrets.KEY_ALIAS }}
-          jarsigner -verify $AAB
-      - name: Upload AAB
+          ./gradlew clean bundleRelease
+          cd ..
+          ls -lh android/app/build/outputs/bundle/release/app-release.aab
+          jarsigner -sigalg SHA256withRSA -digestalg SHA-256 -keystore release.keystore -storepass $STORE_PASS -keypass $KEY_PASS android/app/build/outputs/bundle/release/app-release.aab $KEY_ALIAS
+          jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: FINAL-AAB-SIGNED
+          name: FINAL-AAB
           path: android/app/build/outputs/bundle/release/*.aab
